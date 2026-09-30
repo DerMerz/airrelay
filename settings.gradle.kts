@@ -15,5 +15,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Spiegel"
+rootProject.name = "AirRelay"
 include(":receiver")

@@ -5,7 +5,7 @@
 #include <cstdarg>
 #include <cstdio>
 
-#define LOG_SINK_TAG "SpiegelNative"
+#define LOG_SINK_TAG "AirRelayNative"
 
 /*
  * Log sink of the audio engine. Upstream (jqssun) also forwarded every line to an in-app

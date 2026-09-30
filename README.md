@@ -1,10 +1,10 @@
-# Spiegel (Arbeitsname)
+# AirRelay
 
 Schlanker Empfänger für die Bildschirmsynchronisierung von iPhone und iPad auf Fire TV
 (Fire OS, Android). Nur Spiegelung plus Ton. Kein Video-Weiterreichen, keine Einstellungen,
 kein Bild im Bild. Bedienung nur mit der Fernbedienung.
 
-Paketname vorläufig `de.merzkevin.spiegel` (Variable `appId` in `receiver/build.gradle.kts`).
+Paketname `de.merzkevin.airrelay` (Variable `appId` in `receiver/build.gradle.kts`).
 Der Name wird noch geprüft.
 
 ## Herkunft und Lizenz
@@ -61,13 +61,13 @@ herausnehmen, Tests müssen rot werden): `python3 tools/mutation_check.py`.
 ## Aufbau
 
 ```
-receiver/src/main/cpp/            native Bibliothek libspiegel_native.so
+receiver/src/main/cpp/            native Bibliothek libairrelay_native.so
   native_bridge.cpp               JNI, feste Konfiguration (neu)
   android_raop_callbacks.c        8 Rückrufe nach Kotlin, Rest nativ beantwortet
   android_dnssd_shim.c            TXT-Records für NsdManager (jqssun)
   audio_*.h/.cpp, timeline_buffer.h  Audio-Engine (jqssun), plus Software-Lautstärke
   patches/UxPlay/                 6 Patches aus jqssun, beim Bau angewendet
-receiver/src/main/java/de/merzkevin/spiegel/
+receiver/src/main/java/de/merzkevin/airrelay/
   core/                           reine Logik ohne Android, alles mit JVM-Tests
   ReceiverService.kt              Vordergrunddienst: Server, dns-sd, Zustand
   video/VideoRenderer.kt          MediaCodec direkt auf die SurfaceView
@@ -147,15 +147,15 @@ genau den Weg eines Senders:
 ```
 ffmpeg -f lavfi -i testsrc2=size=1920x1080:rate=60 -t 30 -c:v libx264 -profile:v high \
   -b:v 10M -x264-params aud=1:bframes=0:keyint=100000:scenecut=0 -f h264 land60.h264
-adb shell mkdir -p /sdcard/Android/data/de.merzkevin.spiegel/files
-adb push land60.h264 /sdcard/Android/data/de.merzkevin.spiegel/files/
+adb shell mkdir -p /sdcard/Android/data/de.merzkevin.airrelay/files
+adb push land60.h264 /sdcard/Android/data/de.merzkevin.airrelay/files/
 # App im Vordergrund:
-adb shell am start -n de.merzkevin.spiegel/.MainActivity --es debug_feed land60.h264 --ei debug_fps 60
+adb shell am start -n de.merzkevin.airrelay/.MainActivity --es debug_feed land60.h264 --ei debug_fps 60
 # App im Hintergrund (prüft das Nach-vorn-holen):
-adb shell am broadcast -a de.merzkevin.spiegel.DEBUG_FEED -n de.merzkevin.spiegel/.DebugFeedReceiver \
+adb shell am broadcast -a de.merzkevin.airrelay.DEBUG_FEED -n de.merzkevin.airrelay/.DebugFeedReceiver \
   --es debug_feed land60.h264 --ei debug_fps 60
 # Fehlerbildschirm zeigen, ohne das Netz zu trennen:
-adb shell am start -n de.merzkevin.spiegel/.MainActivity --es debug_status NO_NETWORK
+adb shell am start -n de.merzkevin.airrelay/.MainActivity --es debug_status NO_NETWORK
 ```
 
 ## Messen mit iPhone

@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-MAIN = "receiver/src/main/java/de/merzkevin/spiegel/"
+MAIN = "receiver/src/main/java/de/merzkevin/airrelay/"
 CORE = MAIN + "core/"
 
 # (description, file, original text, mutated text)
@@ -99,9 +99,9 @@ MUTATIONS = [
     ("guard: packaging no longer waits for the tests", "receiver/build.gradle.kts",
      "tasks.matching { it.name == \"package${variant}\" }.configureEach { dependsOn(\"test${variant}UnitTest\") }",
      "tasks.matching { it.name == \"package${variant}\" }.configureEach { }"),
-    ("guard: contract test made skippable", "receiver/src/test/java/de/merzkevin/spiegel/core/CompatContractTest.kt",
+    ("guard: contract test made skippable", "receiver/src/test/java/de/merzkevin/airrelay/core/CompatContractTest.kt",
      "    @Test\n    fun contractIsUnchanged() {", "    @org.junit.Ignore @Test\n    fun contractIsUnchanged() {"),
-    ("guard: screen table lost rows", "receiver/src/test/resources/de/merzkevin/spiegel/core/screen-table.txt",
+    ("guard: screen table lost rows", "receiver/src/test/resources/de/merzkevin/airrelay/core/screen-table.txt",
      "UNLOCKED  RUNNING       1 1 1  MIRRORING\n", ""),
 ]
 

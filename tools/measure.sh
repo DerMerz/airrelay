@@ -2,7 +2,7 @@
 # Measures the receiver on the Fire TV while someone mirrors an iPhone to it.
 #
 #   tools/measure.sh [seconds] [interval] [package]
-#   defaults: 60 s, every 5 s, de.merzkevin.spiegel
+#   defaults: 60 s, every 5 s, de.merzkevin.airrelay
 #
 # Prints PSS (dumpsys meminfo TOTAL, kB) and CPU (top, % of one core) every interval,
 # then reads the log and prints the time from "Client connected" to the first rendered
@@ -14,7 +14,7 @@ set -euo pipefail
 
 SECONDS_TOTAL="${1:-60}"
 INTERVAL="${2:-5}"
-PKG="${3:-de.merzkevin.spiegel}"
+PKG="${3:-de.merzkevin.airrelay}"
 ADB="${ADB:-$(command -v adb || echo /opt/homebrew/bin/adb)}"
 OLD_PKG="io.github.jqssun.airplay"
 OUT_DIR="${OUT_DIR:-$(pwd)}"
@@ -39,7 +39,7 @@ echo "pid $pid"
 "$ADB" logcat -c
 # stream the log to a file from now on: the Fire TV ring buffer is only 256 KB and
 # overwrites our lines within a minute or two, so reading it afterwards is not enough
-"$ADB" logcat -v epoch -s SpiegelService:I SpiegelVideo:I SpiegelNative:I > "$LOG" &
+"$ADB" logcat -v epoch -s AirRelayService:I AirRelayVideo:I AirRelayNative:I > "$LOG" &
 LOGCAT_PID=$!
 trap 'kill "$LOGCAT_PID" 2>/dev/null || true' EXIT
 echo "Now start screen mirroring on the iPhone. Waiting for the connection ..."

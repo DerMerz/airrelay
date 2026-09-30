@@ -1,5 +1,5 @@
 /*
- * JNI bridge between de.merzkevin.spiegel.bridge.NativeBridge and UxPlay.
+ * JNI bridge between de.merzkevin.airrelay.bridge.NativeBridge and UxPlay.
  * Based on native_bridge.cpp from jqssun/android-airplay-server (GPL-3.0), reduced to one
  * fixed configuration: screen mirroring (H.264 only) plus sound, no HLS video, no PIN,
  * no persistent key file.
@@ -25,7 +25,7 @@ extern "C" {
 #include "audio_engine.h"
 #include "log_sink.h"
 
-#define TAG "SpiegelNative"
+#define TAG "AirRelayNative"
 #define LOGI(...) __android_log_print(ANDROID_LOG_INFO, TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, TAG, __VA_ARGS__)
 
@@ -78,7 +78,7 @@ static void _destroy(JNIEnv *env, server_ctx_t *ctx) {
  * Returns 0 on failure.
  */
 extern "C" JNIEXPORT jlong JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeInit(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeInit(
         JNIEnv *env, jobject thiz, jobject callback, jbyteArray hwAddr, jstring name,
         jint width, jint height, jint fps, jboolean advertiseAlac) {
     (void)thiz;
@@ -165,7 +165,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeInit(
 
 /* Returns the bound port, or -1 if the socket could not be bound (e.g. port in use). */
 extern "C" JNIEXPORT jint JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeStart(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeStart(
         JNIEnv *env, jobject thiz, jlong handle, jint requestedPort) {
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -184,7 +184,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeStart(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeStop(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeStop(
         JNIEnv *env, jobject thiz, jlong handle) {
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -193,7 +193,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeStop(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeDestroy(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeDestroy(
         JNIEnv *env, jobject thiz, jlong handle) {
     (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -202,7 +202,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeDestroy(
 
 /* Ends the current session: all known connections are closed by the httpd thread. */
 extern "C" JNIEXPORT void JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeDisconnect(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeDisconnect(
         JNIEnv *env, jobject thiz, jlong handle) {
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -211,7 +211,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeDisconnect(
 
 /* dns-sd TXT records as a flat [key, value, key, value, ...] array */
 extern "C" JNIEXPORT jobjectArray JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeTxtRecords(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeTxtRecords(
         JNIEnv *env, jobject thiz, jlong handle, jboolean raopRecords) {
     (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -240,7 +240,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeTxtRecords(
 
 /* "<hex mac>@<name>", the service name of the _raop._tcp record */
 extern "C" JNIEXPORT jstring JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeRaopServiceName(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeRaopServiceName(
         JNIEnv *env, jobject thiz, jlong handle) {
     (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -249,14 +249,14 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeRaopServiceName(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeSetDefaultStreamValues(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeSetDefaultStreamValues(
         JNIEnv *env, jobject thiz, jint sampleRate, jint framesPerBurst) {
     (void)env; (void)thiz;
     audio_engine_set_default_stream_values(sampleRate, framesPerBurst);
 }
 
 extern "C" JNIEXPORT jboolean JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeAudioStart(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeAudioStart(
         JNIEnv *env, jobject thiz, jlong handle) {
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -265,7 +265,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeAudioStart(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeAudioStop(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeAudioStop(
         JNIEnv *env, jobject thiz, jlong handle) {
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -273,7 +273,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeAudioStop(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeAudioFormat(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeAudioFormat(
         JNIEnv *env, jobject thiz, jlong handle, jint ct, jint spf) {
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
@@ -281,7 +281,7 @@ Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeAudioFormat(
 }
 
 extern "C" JNIEXPORT void JNICALL
-Java_de_merzkevin_spiegel_bridge_NativeBridge_nativeSetGain(
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeSetGain(
         JNIEnv *env, jobject thiz, jlong handle, jint gainQ15) {
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;

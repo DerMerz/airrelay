@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Spiegel" parent="android:Theme.Material.NoActionBar.Fullscreen">
+    <style name="Theme.AirRelay" parent="android:Theme.Material.NoActionBar.Fullscreen">
         <item name="android:windowBackground">@drawable/bg_waiting</item>
         <item name="android:colorAccent">@color/accent</item>
         <item name="android:windowContentOverlay">@null</item>

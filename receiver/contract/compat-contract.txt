@@ -1,5 +1,5 @@
-application-id: de.merzkevin.spiegel
-code-package: de.merzkevin.spiegel
+application-id: de.merzkevin.airrelay
+code-package: de.merzkevin.airrelay
 component: activity .MainActivity [android.intent.action.MAIN,android.intent.category.LAUNCHER,android.intent.category.LEANBACK_LAUNCHER]
 component: service .ReceiverService []
 component: receiver .BootReceiver [android.intent.action.BOOT_COMPLETED]

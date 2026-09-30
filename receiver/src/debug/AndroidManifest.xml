@@ -8,7 +8,7 @@
             tools:ignore="ExportedReceiver"
             xmlns:tools="http://schemas.android.com/tools">
             <intent-filter>
-                <action android:name="de.merzkevin.spiegel.DEBUG_FEED" />
+                <action android:name="de.merzkevin.airrelay.DEBUG_FEED" />
             </intent-filter>
         </receiver>
     </application>

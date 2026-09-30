@@ -8,18 +8,18 @@ plugins {
 // Store identity. Provisional: the name is still being checked. Changing it here changes
 // the installed package only; the Kotlin code package (namespace below) and the JNI
 // function names stay as they are.
-val appId = "de.merzkevin.spiegel"
+val appId = "de.merzkevin.airrelay"
 
 // Source code link shown on the licence screen (GPL-3.0 section 6). Placeholder until the
 // repository is public.
-val sourceUrl = "https://github.com/PLATZHALTER/spiegel"
+val sourceUrl = "https://github.com/PLATZHALTER/airrelay"
 
 val localProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
 }
 
 android {
-    namespace = "de.merzkevin.spiegel"
+    namespace = "de.merzkevin.airrelay"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 

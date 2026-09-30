@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.22.1)
-project(spiegel_native C CXX)
+project(airrelay_native C CXX)
 
 # One shared library, everything else static: OpenSSL, Oboe, libc++, FFmpeg (ALAC only),
 # libplist, llhttp, playfair. Unused code is dropped at link time (gc-sections), the
@@ -23,9 +23,9 @@ set(BUILD_OPENSSL ON CACHE BOOL "" FORCE)
 set(OPENSSL_BUILD_VERSION "3.4.4" CACHE STRING "" FORCE)
 set(OPENSSL_USE_STATIC_LIBS ON CACHE STRING "" FORCE)
 set(CROSS_ANDROID ON CACHE BOOL "" FORCE)
-string(REGEX MATCH "[0-9]+" SPIEGEL_ANDROID_API "${ANDROID_PLATFORM}")
+string(REGEX MATCH "[0-9]+" AIRRELAY_ANDROID_API "${ANDROID_PLATFORM}")
 # CMAKE_C_FLAGS (size flags above) are forwarded to the OpenSSL build by openssl-cmake.
-set(OPENSSL_PARAMS "-D__ANDROID_API__=${SPIEGEL_ANDROID_API}" CACHE STRING "" FORCE)
+set(OPENSSL_PARAMS "-D__ANDROID_API__=${AIRRELAY_ANDROID_API}" CACHE STRING "" FORCE)
 set(OPENSSL_MODULES "no-apps no-docs no-tests no-ui-console no-engine no-dso no-module no-legacy no-deprecated no-comp no-ssl3 no-dtls no-psk no-srp no-srtp no-ct no-ocsp no-cms no-ts no-cmp no-http no-quic no-sock no-autoload-config no-async no-md2 no-md4 no-mdc2 no-rc2 no-rc4 no-rc5 no-idea no-des no-bf no-cast no-camellia no-seed no-aria no-sm2 no-sm3 no-sm4 no-whirlpool no-rmd160 no-blake2 no-siphash no-scrypt no-gost no-dsa no-ec2m no-capieng no-heartbeats" CACHE STRING "" FORCE)
 set(FORWARD_ANDROID_NDK_ROOT "${ANDROID_NDK}" CACHE STRING "" FORCE)
 
@@ -36,7 +36,7 @@ add_subdirectory(third_party/openssl-cmake)
 add_subdirectory(third_party/oboe)
 
 # ---------- FFmpeg: only libavcodec + libavutil with the ALAC decoder ----------
-set(AIRPLAY_ANDROID_API ${SPIEGEL_ANDROID_API})
+set(AIRPLAY_ANDROID_API ${AIRRELAY_ANDROID_API})
 include(BuildFFmpeg)
 
 # ---------- libplist ----------
@@ -110,45 +110,45 @@ set(UXPLAY_SOURCES
     ${UXPLAY_LIB}/utils.c
 )
 
-add_library(spiegel_native SHARED
+add_library(airrelay_native SHARED
     ${UXPLAY_SOURCES}
     android_dnssd_shim.c
     android_raop_callbacks.c
     native_bridge.cpp
     audio_engine.cpp
 )
-add_dependencies(spiegel_native ffmpeg_ep)
+add_dependencies(airrelay_native ffmpeg_ep)
 
-target_include_directories(spiegel_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_include_directories(airrelay_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
 # third-party headers as SYSTEM, so the strict warnings below apply to our code only
-target_include_directories(spiegel_native SYSTEM PRIVATE
+target_include_directories(airrelay_native SYSTEM PRIVATE
     ${UXPLAY_LIB}
     ${UXPLAY_LIB}/llhttp
     ${UXPLAY_LIB}/playfair
     third_party/oboe/include
 )
 
-target_compile_options(spiegel_native PRIVATE -fvisibility=hidden $<$<COMPILE_LANGUAGE:CXX>:-fvisibility-inlines-hidden>)
+target_compile_options(airrelay_native PRIVATE -fvisibility=hidden $<$<COMPILE_LANGUAGE:CXX>:-fvisibility-inlines-hidden>)
 
 # own sources: all warnings are errors (third-party code keeps its own warning level)
 set_source_files_properties(native_bridge.cpp android_raop_callbacks.c android_dnssd_shim.c audio_engine.cpp
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 
-target_compile_definitions(spiegel_native PRIVATE
+target_compile_definitions(airrelay_native PRIVATE
     ANDROID
     __STDC_CONSTANT_MACROS
     PLIST_210
     TARGET_RT_LITTLE_ENDIAN=1
 )
 
-target_link_options(spiegel_native PRIVATE
+target_link_options(airrelay_native PRIVATE
     "-Wl,--build-id=none"
     "-Wl,--gc-sections"
     "-Wl,--exclude-libs,ALL"
     "-Wl,--icf=all"
 )
 
-target_link_libraries(spiegel_native
+target_link_libraries(airrelay_native
     llhttp
     playfair
     crypto
