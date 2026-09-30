@@ -48,6 +48,10 @@ class VideoGeometryTest {
         assertEquals(Size(1280, 720), advertisedSize(Size(1280, 720), Size(4096, 2160)))
     }
 
+    @Test fun a4kTvWithA4kDecoderStillGets1080p() {
+        assertEquals(Size(1920, 1080), advertisedSize(Size(3840, 2160), Size(4096, 2176)))
+    }
+
     @Test fun advertisedSizeRespectsASmallerDecoder() {
         assertEquals(Size(1280, 720), advertisedSize(Size(1920, 1080), Size(1280, 720)))
     }

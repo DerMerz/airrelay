@@ -18,7 +18,9 @@ class GuardsExistTest {
         val f = File(moduleDir, "src/test/java/de/merzkevin/spiegel/core/CompatContractTest.kt")
         assertTrue("CompatContractTest.kt is gone", f.exists())
         val t = f.readText()
-        for (forbidden in listOf("@Ignore", "Assume.", "assumeTrue", "assumeFalse")) {
+        // also catches fully qualified forms such as @org.junit.Ignore
+        assertFalse("CompatContractTest must not be ignored", Regex("@[\\w.]*Ignore\\b").containsMatchIn(t))
+        for (forbidden in listOf("Assume.", "assumeTrue", "assumeFalse", "assumeNotNull")) {
             assertFalse("CompatContractTest must not skip ($forbidden)", t.contains(forbidden))
         }
         assertTrue("detector self-test is gone", t.contains("detectorSeesStoredPreferencesThatAppear"))
