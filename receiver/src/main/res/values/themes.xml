@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.Spiegel" parent="android:Theme.Material.NoActionBar.Fullscreen">
+        <item name="android:windowBackground">@drawable/bg_waiting</item>
+        <item name="android:colorAccent">@color/accent</item>
+        <item name="android:windowContentOverlay">@null</item>
+        <item name="android:textViewStyle">@style/TextNoHyphens</item>
+    </style>
+
+    <!-- words are never split at line ends, in any language -->
+    <style name="TextNoHyphens" parent="android:Widget.Material.TextView">
+        <item name="android:hyphenationFrequency">none</item>
+        <item name="android:breakStrategy">balanced</item>
+    </style>
+
+    <style name="StepNumber" parent="TextNoHyphens">
+        <item name="android:layout_width">36dp</item>
+        <item name="android:layout_height">36dp</item>
+        <item name="android:layout_marginEnd">18dp</item>
+        <item name="android:background">@drawable/step_circle</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textColor">@color/accent</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+
+    <style name="StepText" parent="TextNoHyphens">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:textColor">@color/text_secondary</item>
+        <item name="android:textSize">24sp</item>
+        <item name="android:lineSpacingExtra">4dp</item>
+    </style>
+
+    <style name="TvButton" parent="TextNoHyphens">
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:background">@drawable/tv_button</item>
+        <item name="android:focusable">true</item>
+        <item name="android:clickable">true</item>
+        <item name="android:paddingStart">28dp</item>
+        <item name="android:paddingEnd">28dp</item>
+        <item name="android:paddingTop">12dp</item>
+        <item name="android:paddingBottom">12dp</item>
+        <item name="android:textColor">@color/tv_button_text</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:fontFamily">sans-serif-medium</item>
+    </style>
+</resources>

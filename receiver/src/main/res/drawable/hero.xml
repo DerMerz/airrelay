@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- phone mirroring onto a TV, outline style -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="360dp" android:height="260dp" android:viewportWidth="360" android:viewportHeight="260">
+    <!-- TV -->
+    <path android:strokeColor="#FF7DB8FF" android:strokeWidth="5" android:strokeLineJoin="round"
+        android:fillColor="#1A7DB8FF"
+        android:pathData="M96,20h244a10,10 0,0 1,10 10v146a10,10 0,0 1,-10 10H96a10,10 0,0 1,-10 -10V30a10,10 0,0 1,10 -10z" />
+    <path android:strokeColor="#FF7DB8FF" android:strokeWidth="5" android:strokeLineCap="round"
+        android:pathData="M180,214h76M218,186v28" />
+    <!-- mirrored picture inside the TV -->
+    <path android:fillColor="#337DB8FF"
+        android:pathData="M198,40h40a8,8 0,0 1,8 8v110a8,8 0,0 1,-8 8h-40a8,8 0,0 1,-8 -8V48a8,8 0,0 1,8 -8z" />
+    <!-- phone -->
+    <path android:strokeColor="#FFF4F7FC" android:strokeWidth="5" android:strokeLineJoin="round"
+        android:fillColor="#FF101A33"
+        android:pathData="M24,96h60a12,12 0,0 1,12 12v128a12,12 0,0 1,-12 12H24a12,12 0,0 1,-12 -12V108a12,12 0,0 1,12 -12z" />
+    <path android:fillColor="#FFF4F7FC" android:pathData="M44,104h20a3,3 0,0 1,0 6H44a3,3 0,0 1,0 -6z" />
+    <!-- waves from phone to TV -->
+    <path android:strokeColor="#FFF4F7FC" android:strokeWidth="5" android:strokeLineCap="round"
+        android:pathData="M104,86a34,34 0,0 1,26 -26" />
+    <path android:strokeColor="#99F4F7FC" android:strokeWidth="5" android:strokeLineCap="round"
+        android:pathData="M100,62a58,58 0,0 1,46 -46" />
+</vector>

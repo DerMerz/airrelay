@@ -1,0 +1,237 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Designed for the Fire TV canvas of 960x540 dp. Only D-pad focusable controls. -->
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/root"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <!-- waiting layout: status, name, how-to -->
+    <LinearLayout
+        android:id="@+id/waiting_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="72dp"
+        android:paddingTop="32dp"
+        android:paddingEnd="56dp"
+        android:paddingBottom="96dp">
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/status_label"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:fontFamily="sans-serif-medium"
+                android:letterSpacing="0.12"
+                android:textAllCaps="true"
+                android:textColor="@color/status_label"
+                android:textSize="18sp"
+                tools:text="Bereit zum Spiegeln" />
+
+            <TextView
+                android:id="@+id/title_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:breakStrategy="balanced"
+                android:fontFamily="sans-serif-medium"
+                android:hyphenationFrequency="none"
+                android:textColor="@color/text_primary"
+                android:textSize="60sp"
+                tools:text="Kevins 2. FireTVStick" />
+
+            <LinearLayout
+                android:id="@+id/steps_block"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="36dp"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView style="@style/StepNumber" android:text="1" tools:ignore="HardcodedText" />
+
+                    <TextView style="@style/StepText" android:text="@string/step_control_center" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView style="@style/StepNumber" android:text="2" tools:ignore="HardcodedText" />
+
+                    <TextView style="@style/StepText" android:text="@string/step_mirroring" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="18dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView style="@style/StepNumber" android:text="3" tools:ignore="HardcodedText" />
+
+                    <TextView
+                        android:id="@+id/step3"
+                        style="@style/StepText"
+                        tools:text="Wähle „Kevins 2. FireTVStick“ aus." />
+                </LinearLayout>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/body_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:lineSpacingExtra="4dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="24sp"
+                android:visibility="gone" />
+
+            <LinearLayout
+                android:id="@+id/error_actions"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="32dp"
+                android:orientation="horizontal"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/retry_button"
+                    style="@style/TvButton"
+                    android:text="@string/retry" />
+
+                <TextView
+                    android:id="@+id/network_button"
+                    style="@style/TvButton"
+                    android:layout_marginStart="16dp"
+                    android:text="@string/network_settings" />
+            </LinearLayout>
+        </LinearLayout>
+
+        <ImageView
+            android:layout_width="300dp"
+            android:layout_height="217dp"
+            android:layout_marginStart="32dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/hero" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/ip_text"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="72dp"
+        android:layout_marginBottom="40dp"
+        android:textColor="@color/text_tertiary"
+        android:textSize="16sp"
+        tools:text="IP-Adresse 192.168.8.11" />
+
+    <TextView
+        android:id="@+id/licenses_button"
+        style="@style/TvButton"
+        android:layout_gravity="bottom|end"
+        android:layout_marginEnd="48dp"
+        android:layout_marginBottom="28dp"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:paddingStart="20dp"
+        android:paddingEnd="20dp"
+        android:text="@string/licenses"
+        android:textSize="16sp" />
+
+    <!-- full-screen picture -->
+    <FrameLayout
+        android:id="@+id/video_frame"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FF000000"
+        android:visibility="gone">
+
+        <SurfaceView
+            android:id="@+id/video_surface"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:layout_gravity="center" />
+
+        <TextView
+            android:id="@+id/connecting_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="@string/connecting"
+            android:textColor="@color/text_secondary"
+            android:textSize="28sp" />
+
+        <TextView
+            android:id="@+id/stop_hint"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="48dp"
+            android:background="@drawable/pill"
+            android:paddingStart="28dp"
+            android:paddingTop="14dp"
+            android:paddingEnd="28dp"
+            android:paddingBottom="14dp"
+            android:text="@string/stop_hint"
+            android:textColor="@color/text_primary"
+            android:textSize="22sp"
+            android:visibility="gone" />
+    </FrameLayout>
+
+    <!-- licences, opened from the waiting screen -->
+    <ScrollView
+        android:id="@+id/licenses_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@color/bg_top"
+        android:clipToPadding="false"
+        android:focusable="true"
+        android:paddingStart="72dp"
+        android:paddingTop="40dp"
+        android:paddingEnd="72dp"
+        android:paddingBottom="40dp"
+        android:scrollbarStyle="outsideOverlay"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="20dp"
+                android:fontFamily="sans-serif-medium"
+                android:text="@string/licenses"
+                android:textColor="@color/text_primary"
+                android:textSize="32sp" />
+
+            <TextView
+                android:id="@+id/licenses_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:lineSpacingExtra="3dp"
+                android:textColor="@color/text_secondary"
+                android:textSize="18sp" />
+        </LinearLayout>
+    </ScrollView>
+</FrameLayout>

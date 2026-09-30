@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="notification_channel">Empfänger</string>
+    <string name="notification_title">Bildschirm-Empfänger ist an</string>
+    <string name="notification_text">Bereit für iPhone und iPad</string>
+
+    <string name="status_starting">Wird gestartet</string>
+    <string name="status_ready">Bereit zum Spiegeln</string>
+    <string name="status_audio">Ton wird abgespielt</string>
+    <string name="status_problem">Nicht bereit</string>
+    <string name="status_locked">Nicht freigeschaltet</string>
+
+    <string name="step_control_center">Öffne auf dem iPhone oder iPad das Kontrollzentrum.</string>
+    <string name="step_mirroring">Tippe auf „Bildschirmsynchronisierung“.</string>
+    <string name="step_choose">Wähle „%1$s“ aus.</string>
+    <string name="ip_address">IP-Adresse %1$s</string>
+
+    <string name="connecting">Verbindung wird hergestellt …</string>
+    <string name="stop_hint">Zum Beenden der Spiegelung noch einmal Zurück drücken</string>
+
+    <string name="audio_body">Der Ton von deinem iPhone oder iPad läuft über diesen Fernseher.</string>
+
+    <string name="no_network_title">Kein Netzwerk</string>
+    <string name="no_network_body">Dieser Fire TV ist mit keinem Netzwerk verbunden. Verbinde ihn mit demselben WLAN wie dein iPhone oder iPad.</string>
+    <string name="start_failed_title">Empfänger startet nicht</string>
+    <string name="port_in_use_body">Eine andere App auf diesem Fire TV belegt den Netzwerkanschluss für die Bildschirmspiegelung. Beende andere Spiegel-Apps und versuche es erneut.</string>
+    <string name="start_failed_body">Beim Start ist ein Fehler aufgetreten. Versuche es erneut. Hilft das nicht, starte den Fire TV neu.</string>
+    <string name="locked_body">Dieser Empfänger muss freigeschaltet werden.</string>
+    <string name="retry">Erneut versuchen</string>
+    <string name="network_settings">Netzwerkeinstellungen</string>
+
+    <string name="licenses">Open-Source-Lizenzen</string>
+    <string name="licenses_intro">Diese App ist freie Software. Du darfst sie unter den Bedingungen der GNU General Public License, Version 3, weitergeben und verändern. Sie wird ohne jede Gewährleistung bereitgestellt.\n\nQuelltext: %1$s\n\nEnthaltene Software:\n• android-airplay-server von jqssun (GPL-3.0), Grundlage dieser App\n• UxPlay (GPL-3.0), mit Teilen aus RPiPlay und ShairPlay (LGPL-2.1 oder neuer) sowie playfair (GPL)\n• libplist (LGPL-2.1 oder neuer)\n• llhttp (MIT)\n• OpenSSL (Apache-2.0)\n• FFmpeg, nur der ALAC-Decoder (LGPL-2.1 oder neuer)\n• Oboe (Apache-2.0)\n\niPhone und iPad sind Marken von Apple Inc. Fire TV ist eine Marke von Amazon.com, Inc. oder verbundenen Unternehmen. Diese App steht in keiner Verbindung zu Apple oder Amazon.\n\nEs folgt der vollständige Text der GNU General Public License, Version 3 (englisch).</string>
+</resources>
