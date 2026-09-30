@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- provisional product name, still being checked -->
-    <string name="app_name" translatable="false">Spiegel</string>
+    <string name="app_name" translatable="false">AirRelay</string>
 
     <string name="notification_channel">Receiver</string>
     <string name="notification_title">Screen receiver is on</string>
@@ -32,6 +32,6 @@
     <string name="retry">Try again</string>
     <string name="network_settings">Network settings</string>
 
-    <string name="licenses">Open source licences</string>
+    <string name="licenses">Licences</string>
     <string name="licenses_intro">This app is free software. You may redistribute and modify it under the terms of the GNU General Public License, version 3. It comes without any warranty.\n\nSource code: %1$s\n\nIncluded software:\n• android-airplay-server by jqssun (GPL-3.0), the basis of this app\n• UxPlay (GPL-3.0), with parts of RPiPlay and ShairPlay (LGPL-2.1 or later) and playfair (GPL)\n• libplist (LGPL-2.1 or later)\n• llhttp (MIT)\n• OpenSSL (Apache-2.0)\n• FFmpeg, only the ALAC decoder (LGPL-2.1 or later)\n• Oboe (Apache-2.0)\n\niPhone and iPad are trademarks of Apple Inc. Fire TV is a trademark of Amazon.com, Inc. or its affiliates. This app is not affiliated with Apple or Amazon.\n\nThe full text of the GNU General Public License, version 3, follows.</string>
 </resources>

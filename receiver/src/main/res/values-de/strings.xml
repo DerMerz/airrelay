@@ -29,6 +29,6 @@
     <string name="retry">Erneut versuchen</string>
     <string name="network_settings">Netzwerkeinstellungen</string>
 
-    <string name="licenses">Open-Source-Lizenzen</string>
+    <string name="licenses">Lizenzen</string>
     <string name="licenses_intro">Diese App ist freie Software. Du darfst sie unter den Bedingungen der GNU General Public License, Version 3, weitergeben und verändern. Sie wird ohne jede Gewährleistung bereitgestellt.\n\nQuelltext: %1$s\n\nEnthaltene Software:\n• android-airplay-server von jqssun (GPL-3.0), Grundlage dieser App\n• UxPlay (GPL-3.0), mit Teilen aus RPiPlay und ShairPlay (LGPL-2.1 oder neuer) sowie playfair (GPL)\n• libplist (LGPL-2.1 oder neuer)\n• llhttp (MIT)\n• OpenSSL (Apache-2.0)\n• FFmpeg, nur der ALAC-Decoder (LGPL-2.1 oder neuer)\n• Oboe (Apache-2.0)\n\niPhone und iPad sind Marken von Apple Inc. Fire TV ist eine Marke von Amazon.com, Inc. oder verbundenen Unternehmen. Diese App steht in keiner Verbindung zu Apple oder Amazon.\n\nEs folgt der vollständige Text der GNU General Public License, Version 3 (englisch).</string>
 </resources>
