@@ -1,0 +1,15 @@
+application-id: de.merzkevin.spiegel
+code-package: de.merzkevin.spiegel
+component: activity .MainActivity [android.intent.action.MAIN,android.intent.category.LAUNCHER,android.intent.category.LEANBACK_LAUNCHER]
+component: service .ReceiverService []
+component: receiver .BootReceiver [android.intent.action.BOOT_COMPLETED]
+notification-channel: receiver
+dns-sd-type: _airplay._tcp
+dns-sd-type: _raop._tcp
+reads-setting: global/device_name
+persistence: none
+device-id("3f2a9c01d4e5b6a7"): 62:40:D4:9A:D3:FA
+device-id("0123456789abcdef"): 8E:61:8F:51:AD:E7
+device-id(""): 0A:53:50:49:45:47
+receiver-name-fallback: Fire TV
+receiver-name-max-bytes: 50
