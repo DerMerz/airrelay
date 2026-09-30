@@ -1,0 +1,20 @@
+[submodule "receiver/src/main/cpp/third_party/UxPlay"]
+	path = receiver/src/main/cpp/third_party/UxPlay
+	url = https://github.com/FDH2/UxPlay.git
+	shallow = true
+[submodule "receiver/src/main/cpp/third_party/libplist"]
+	path = receiver/src/main/cpp/third_party/libplist
+	url = https://github.com/libimobiledevice/libplist.git
+	shallow = true
+[submodule "receiver/src/main/cpp/third_party/openssl-cmake"]
+	path = receiver/src/main/cpp/third_party/openssl-cmake
+	url = https://github.com/viaduck/openssl-cmake.git
+	shallow = true
+[submodule "receiver/src/main/cpp/third_party/ffmpeg"]
+	path = receiver/src/main/cpp/third_party/ffmpeg
+	url = https://github.com/FFmpeg/FFmpeg.git
+	shallow = true
+[submodule "receiver/src/main/cpp/third_party/oboe"]
+	path = receiver/src/main/cpp/third_party/oboe
+	url = https://github.com/google/oboe.git
+	shallow = true
