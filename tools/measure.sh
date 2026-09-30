@@ -37,18 +37,23 @@ fi
 echo "pid $pid"
 
 "$ADB" logcat -c
+# stream the log to a file from now on: the Fire TV ring buffer is only 256 KB and
+# overwrites our lines within a minute or two, so reading it afterwards is not enough
+"$ADB" logcat -v epoch -s SpiegelService:I SpiegelVideo:I SpiegelNative:I > "$LOG" &
+LOGCAT_PID=$!
+trap 'kill "$LOGCAT_PID" 2>/dev/null || true' EXIT
 echo "Now start screen mirroring on the iPhone. Waiting for the connection ..."
 for _ in $(seq 1 120); do
-  if "$ADB" logcat -d -s SpiegelService:I | grep -q "Client connected"; then break; fi
+  if grep -q "Client connected" "$LOG"; then break; fi
   sleep 1
 done
-if ! "$ADB" logcat -d -s SpiegelService:I | grep -q "Client connected"; then
+if ! grep -q "Client connected" "$LOG"; then
   echo "no sender connected within 120 s" >&2
   exit 1
 fi
 echo "connected, measuring for ${SECONDS_TOTAL}s"
 
-echo "t_s,pss_kb,cpu_pct,screen" > "$CSV"
+echo "t_s,pss_kb,cpu_pct,mirroring_started" > "$CSV"
 start=$(date +%s)
 while :; do
   now=$(date +%s)
@@ -56,12 +61,13 @@ while :; do
   (( t > SECONDS_TOTAL )) && break
   pss=$("$ADB" shell dumpsys meminfo "$PKG" | awk '/TOTAL/ && !/TOTAL SWAP/ {print $2; exit}' | tr -d '\r')
   cpu=$("$ADB" shell top -b -n 1 -p "$pid" | awk -v p="$pid" '$1==p {print $9; exit}' | tr -d '\r')
-  mirroring=$("$ADB" logcat -d -s SpiegelService:I | grep -c "Mirroring started" || true)
+  mirroring=$(grep -c "Mirroring started" "$LOG" || true)
   echo "$t,$pss,$cpu,$mirroring" | tee -a "$CSV"
   sleep "$INTERVAL"
 done
 
-"$ADB" logcat -d -v epoch -s SpiegelService:I SpiegelVideo:I SpiegelNative:I > "$LOG"
+sleep 1
+kill "$LOGCAT_PID" 2>/dev/null || true
 
 # first "Client connected" and first "First frame rendered" (epoch seconds.millis)
 connected=$(awk '/Client connected/ {print $1; exit}' "$LOG")
