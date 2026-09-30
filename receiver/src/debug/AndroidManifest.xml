@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- debug builds only: lets adb feed a test stream while the app is in the background -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <application>
+        <receiver
+            android:name=".DebugFeedReceiver"
+            android:exported="true"
+            tools:ignore="ExportedReceiver"
+            xmlns:tools="http://schemas.android.com/tools">
+            <intent-filter>
+                <action android:name="de.merzkevin.spiegel.DEBUG_FEED" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
