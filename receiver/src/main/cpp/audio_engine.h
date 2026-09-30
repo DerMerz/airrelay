@@ -27,6 +27,9 @@ bool audio_engine_configure(AudioEngine *engine, int cushionMs, int percentilePc
                             int oboeBufferFrames, bool forceSwAlac, bool realtimePriority,
                             bool lowLatency, bool benchmarkLog);
 
+/* output gain in Q15 (32768 = unity, 0 = mute); any thread */
+void audio_engine_set_gain_q15(AudioEngine *engine, int32_t gainQ15);
+
 /* sender is switching audio formats */
 void audio_engine_on_format(AudioEngine *engine, int ct, int spf);
 

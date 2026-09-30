@@ -48,7 +48,7 @@ struct CodecFormat {
 
 struct AudioEngine {
     AudioEngine(std::shared_ptr<LogSink> log, int sampleRate, int channels)
-        : mLog(std::move(log)), mSampleRate(sampleRate), mChannels(channels) {
+        : mSampleRate(sampleRate), mChannels(channels), mLog(std::move(log)) {
         mQueued[ctIndex(CT_ALAC)].store(CodecFormat{352}, std::memory_order_relaxed);
         mQueued[ctIndex(CT_AAC_LC)].store(CodecFormat{1024}, std::memory_order_relaxed);
         mQueued[ctIndex(CT_AAC_ELD)].store(CodecFormat{480}, std::memory_order_relaxed);
@@ -100,6 +100,9 @@ struct AudioEngine {
         if (i < 0 || spf <= 0) return;
         mQueued[i].store(CodecFormat{spf}, std::memory_order_release);
     }
+
+    // Q15 software gain, read lock-free by the oboe callback; survives output rebuilds
+    void setGainQ15(int32_t g) { mGainQ15->store(g, std::memory_order_relaxed); }
 
     bool copyDebug(void *dst, size_t dstLen) {
         if (dstLen < sizeof(AudioDebugData)) return false;
@@ -165,7 +168,7 @@ private:
         mTimeline = std::make_shared<TimelineBuffer>(mSampleRate, mChannels,
                                                      cfg.staticCushionMs, cfg.percentilePct);
         mOutput = AudioOutput::create(mSampleRate, mChannels, cfg.oboeBufferFrames,
-                                      cfg.lowLatency, mTimeline, mLog);
+                                      cfg.lowLatency, mTimeline, mLog, mGainQ15);
         mApplied = std::make_unique<AudioConfig>(cfg);
     }
 
@@ -173,6 +176,8 @@ private:
     const int mChannels;
     std::unique_ptr<AudioConfig> mApplied;
     std::shared_ptr<LogSink> mLog;
+    std::shared_ptr<std::atomic<int32_t>> mGainQ15 =
+        std::make_shared<std::atomic<int32_t>>(OboeCallbacks::GAIN_UNITY_Q15);
 
     // thread safety: decode thread reads mTimeline/mOutput unguarded (nothing else writes them outside teardown) and writes them under mRebuildLock
     // all other threads read them under mRebuildLock; mDecoder is decode-thread-only
@@ -228,6 +233,10 @@ bool audio_engine_configure(AudioEngine *engine, int cushionMs, int percentilePc
     if (!engine) return false;
     return engine->configure({cushionMs, percentilePct, oboeBufferFrames, forceSwAlac,
                               realtimePriority, lowLatency, benchmarkLog});
+}
+
+void audio_engine_set_gain_q15(AudioEngine *engine, int32_t gainQ15) {
+    if (engine) engine->setGainQ15(gainQ15);
 }
 
 void audio_engine_on_format(AudioEngine *engine, int ct, int spf) {

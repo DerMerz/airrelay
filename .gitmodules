@@ -2,6 +2,7 @@
 	path = receiver/src/main/cpp/third_party/UxPlay
 	url = https://github.com/FDH2/UxPlay.git
 	shallow = true
+	ignore = dirty
 [submodule "receiver/src/main/cpp/third_party/libplist"]
 	path = receiver/src/main/cpp/third_party/libplist
 	url = https://github.com/libimobiledevice/libplist.git

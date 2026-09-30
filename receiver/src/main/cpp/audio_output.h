@@ -3,6 +3,7 @@
 
 #include <oboe/Oboe.h>
 #include <atomic>
+#include <cstring>
 #include <memory>
 #include <mutex>
 
@@ -22,14 +23,29 @@ class AudioOutput;
 class OboeCallbacks : public oboe::AudioStreamDataCallback,
                       public oboe::AudioStreamErrorCallback {
 public:
-    OboeCallbacks(std::shared_ptr<TimelineBuffer> timeline, std::shared_ptr<LogSink> log)
-        : mTimeline(std::move(timeline)), mLog(std::move(log)) {}
+    OboeCallbacks(std::shared_ptr<TimelineBuffer> timeline, std::shared_ptr<LogSink> log,
+                  std::shared_ptr<std::atomic<int32_t>> gainQ15)
+        : mTimeline(std::move(timeline)), mLog(std::move(log)), mGainQ15(std::move(gainQ15)) {}
 
-    oboe::DataCallbackResult onAudioReady(oboe::AudioStream *, void *audioData,
+    oboe::DataCallbackResult onAudioReady(oboe::AudioStream *stream, void *audioData,
                                           int32_t numFrames) override {
-        mTimeline->read(static_cast<int16_t *>(audioData), numFrames);
+        auto *pcm = static_cast<int16_t *>(audioData);
+        mTimeline->read(pcm, numFrames);
+        // sender volume as software gain (Q15, 32768 = unity); the device volume stays
+        // under the control of the TV remote
+        const int32_t g = mGainQ15->load(std::memory_order_relaxed);
+        if (g < GAIN_UNITY_Q15) {
+            const int32_t n = numFrames * stream->getChannelCount();
+            if (g <= 0) {
+                memset(pcm, 0, sizeof(int16_t) * (size_t)n);
+            } else {
+                for (int32_t i = 0; i < n; i++) pcm[i] = (int16_t)((pcm[i] * g) >> 15);
+            }
+        }
         return oboe::DataCallbackResult::Continue;
     }
+
+    static constexpr int32_t GAIN_UNITY_Q15 = 32768;
 
     void onErrorAfterClose(oboe::AudioStream *, oboe::Result error) override;  // needs AudioOutput
 
@@ -38,6 +54,7 @@ private:
 
     std::shared_ptr<TimelineBuffer> mTimeline;
     std::shared_ptr<LogSink> mLog;
+    std::shared_ptr<std::atomic<int32_t>> mGainQ15;
     std::weak_ptr<AudioOutput> mOwner;
 };
 
@@ -50,18 +67,21 @@ public:
     static std::shared_ptr<AudioOutput> create(int sampleRate, int channels, int oboeBufferFrames,
                                                bool lowLatency,
                                                std::shared_ptr<TimelineBuffer> timeline,
-                                               std::shared_ptr<LogSink> log) {
+                                               std::shared_ptr<LogSink> log,
+                                               std::shared_ptr<std::atomic<int32_t>> gainQ15) {
         auto out = std::make_shared<AudioOutput>(sampleRate, channels, oboeBufferFrames,
-                                                 lowLatency, std::move(timeline), std::move(log));
+                                                 lowLatency, std::move(timeline), std::move(log),
+                                                 std::move(gainQ15));
         out->mCallbacks->mOwner = out;
         return out;
     }
 
     AudioOutput(int sampleRate, int channels, int oboeBufferFrames, bool lowLatency,
-                std::shared_ptr<TimelineBuffer> timeline, std::shared_ptr<LogSink> log)
+                std::shared_ptr<TimelineBuffer> timeline, std::shared_ptr<LogSink> log,
+                std::shared_ptr<std::atomic<int32_t>> gainQ15)
         : mSampleRate(sampleRate), mChannels(channels), mOboeBufferFrames(oboeBufferFrames),
           mLowLatency(lowLatency), mTimeline(std::move(timeline)), mLog(std::move(log)),
-          mCallbacks(std::make_shared<OboeCallbacks>(mTimeline, mLog)) {}
+          mCallbacks(std::make_shared<OboeCallbacks>(mTimeline, mLog, std::move(gainQ15))) {}
 
     ~AudioOutput() { stop(); }
 

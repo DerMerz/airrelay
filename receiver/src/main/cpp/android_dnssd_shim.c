@@ -56,6 +56,7 @@ static void _txt_set(txt_record_t *rec, const char *key, const char *val) {
 }
 
 void *dnssd_private_init(dnssd_t *dnssd, int *error) {
+    (void)dnssd;
     if (error) *error = DNSSD_ERROR_NOERROR;
     dnssd_private_t *priv = (dnssd_private_t *) calloc(1, sizeof(dnssd_private_t));
     if (!priv) {
@@ -71,12 +72,14 @@ void dnssd_private_destroy(void *priv) {
 }
 
 void dnssd_error_text(int *error, const char *appname) {
+    (void)appname;
     printf("dnssd (android NsdManager) failed with error code %d\n", *error);
 }
 
 int
 dnssd_register_raop(dnssd_t *dnssd, unsigned short port)
 {
+    (void)port; /* the port goes into the NsdManager registration, not the TXT record */
     char features[22] = {0};
     dnssd_private_t *priv = _priv(dnssd);
 
@@ -135,6 +138,7 @@ dnssd_register_raop(dnssd_t *dnssd, unsigned short port)
 int
 dnssd_register_airplay(dnssd_t *dnssd, unsigned short port)
 {
+    (void)port;
     char device_id[3 * MAX_HWADDR_LEN];
     char features[22] = {0};
     dnssd_private_t *priv = _priv(dnssd);
@@ -173,15 +177,17 @@ dnssd_register_airplay(dnssd_t *dnssd, unsigned short port)
 }
 
 /* unregisters with NsdManager */
-void dnssd_unregister_raop(dnssd_t *dnssd) {}
-void dnssd_unregister_airplay(dnssd_t *dnssd) {}
+void dnssd_unregister_raop(dnssd_t *dnssd) { (void)dnssd; }
+void dnssd_unregister_airplay(dnssd_t *dnssd) { (void)dnssd; }
 
 const char *dnssd_get_raop_txt(dnssd_t *dnssd, int *length) {
+    (void)dnssd;
     if (length) *length = 0;
     return NULL;
 }
 
 const char *dnssd_get_airplay_txt(dnssd_t *dnssd, int *length) {
+    (void)dnssd;
     if (length) *length = 0;
     return NULL;
 }
