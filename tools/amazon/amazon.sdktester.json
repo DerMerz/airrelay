@@ -1,0 +1,22 @@
+{
+  "de.merzkevin.airrelay.pro.monthly": {
+    "itemType": "SUBSCRIPTION",
+    "price": 2.49,
+    "title": "AirRelay",
+    "description": "AirRelay, monatlich",
+    "smallIconUrl": "https://merzkevin.de/favicon.png",
+    "subscriptionParent": "de.merzkevin.airrelay.pro",
+    "term": "Monthly",
+    "freeTrialPeriod": "Weekly"
+  },
+  "de.merzkevin.airrelay.pro.yearly": {
+    "itemType": "SUBSCRIPTION",
+    "price": 14.99,
+    "title": "AirRelay",
+    "description": "AirRelay, jährlich",
+    "smallIconUrl": "https://merzkevin.de/favicon.png",
+    "subscriptionParent": "de.merzkevin.airrelay.pro",
+    "term": "Annually",
+    "freeTrialPeriod": "Weekly"
+  }
+}
