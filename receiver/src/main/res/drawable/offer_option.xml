@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- focused: white fill; activated (the preselected yearly term): accent outline -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape>
+            <corners android:radius="18dp" />
+            <solid android:color="@color/focus_fill" />
+        </shape>
+    </item>
+    <item android:state_activated="true">
+        <shape>
+            <corners android:radius="18dp" />
+            <solid android:color="@color/chip_fill" />
+            <stroke android:width="2dp" android:color="@color/accent" />
+        </shape>
+    </item>
+    <item>
+        <shape>
+            <corners android:radius="18dp" />
+            <solid android:color="@color/chip_fill" />
+        </shape>
+    </item>
+</selector>

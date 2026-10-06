@@ -6,17 +6,140 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- waiting layout: status, name, how-to -->
+    <!-- waiting layout: subscription offer (only without subscription), status, name, how-to -->
     <LinearLayout
         android:id="@+id/waiting_panel"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center_vertical"
-        android:orientation="horizontal"
+        android:orientation="vertical"
         android:paddingStart="72dp"
         android:paddingTop="32dp"
         android:paddingEnd="56dp"
         android:paddingBottom="96dp">
+
+    <LinearLayout
+        android:id="@+id/offer_box"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="14dp"
+        android:background="@drawable/offer_box"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingTop="12dp"
+        android:paddingEnd="24dp"
+        android:paddingBottom="14dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/attempt_text"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp"
+            android:text="@string/attempt_refused"
+            android:textColor="@color/warning"
+            android:textSize="18sp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/offer_headline"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:fontFamily="sans-serif-medium"
+            android:textColor="@color/text_primary"
+            android:textSize="26sp"
+            tools:text="7 Tage gratis testen" />
+
+        <TextView
+            android:id="@+id/offer_body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="4dp"
+            android:lineSpacingExtra="2dp"
+            android:textColor="@color/text_secondary"
+            android:textSize="16sp"
+            tools:text="@string/offer_renewal" />
+
+        <LinearLayout
+            android:id="@+id/offer_actions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:baselineAligned="false"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/option_yearly"
+                style="@style/OfferOption">
+
+                <TextView
+                    style="@style/OfferOptionTitle"
+                    android:text="@string/term_yearly" />
+
+                <TextView
+                    android:id="@+id/option_yearly_price"
+                    style="@style/OfferOptionDetail"
+                    tools:text="7 Tage gratis, dann 14,99 €/Jahr" />
+
+                <TextView
+                    android:id="@+id/option_yearly_compare"
+                    style="@style/OfferOptionDetail"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="15sp"
+                    android:textColor="@color/offer_option_compare"
+                    tools:text="1,25 € im Monat, 49 % günstiger" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/option_monthly"
+                style="@style/OfferOption"
+                android:layout_marginStart="12dp">
+
+                <TextView
+                    style="@style/OfferOptionTitle"
+                    android:text="@string/term_monthly" />
+
+                <TextView
+                    android:id="@+id/option_monthly_price"
+                    style="@style/OfferOptionDetail"
+                    tools:text="7 Tage gratis, dann 2,49 €/Monat" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/restore_button"
+                style="@style/TvButton"
+                android:layout_marginStart="12dp"
+                android:nextFocusRight="@id/restore_button"
+                android:paddingStart="20dp"
+                android:paddingEnd="20dp"
+                android:text="@string/restore"
+                android:textSize="16sp" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/offer_retry"
+            style="@style/TvButton"
+            android:layout_marginTop="14dp"
+            android:text="@string/retry"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/offer_message"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:textColor="@color/status_label"
+            android:textSize="16sp"
+            android:visibility="gone"
+            tools:text="Der Kauf wurde abgebrochen. Es wurde nichts berechnet." />
+    </LinearLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal">
 
         <LinearLayout
             android:layout_width="0dp"
@@ -66,6 +189,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/step_row2"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
@@ -78,6 +202,7 @@
                 </LinearLayout>
 
                 <LinearLayout
+                    android:id="@+id/step_row3"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
@@ -125,11 +250,13 @@
         </LinearLayout>
 
         <ImageView
+            android:id="@+id/hero_image"
             android:layout_width="300dp"
             android:layout_height="217dp"
             android:layout_marginStart="32dp"
             android:importantForAccessibility="no"
             android:src="@drawable/hero" />
+    </LinearLayout>
     </LinearLayout>
 
     <TextView
