@@ -47,9 +47,28 @@ echo "sdk.dir=$ANDROID_HOME" > local.properties
 ./gradlew --stop
 ```
 
-Ergebnis: `receiver/build/outputs/apk/release/receiver-release.apk`. Ohne Release-Schlüssel
-in `local.properties` (`storeFile`, `storePassword`, `keyAlias`, `keyPassword`) wird mit dem
-lokalen Debug-Schlüssel signiert: installierbar zum Testen, nie für den Store.
+Ergebnis: `receiver/build/outputs/apk/release/receiver-release.apk`. Ohne Upload-Schlüssel
+wird mit dem lokalen Debug-Schlüssel signiert: installierbar zum Messen, nie für den Store.
+
+Store-Build: `tools/build_release.sh`. Das Skript holt das Keystore-Passwort aus dem
+macOS-Schlüsselbund, baut mit `AIRRELAY_REQUIRE_UPLOAD_KEY=1` (ohne Upload-Schlüssel bricht
+Gradle ab, kein Rückfall auf den Debug-Schlüssel) und prüft danach mit `apksigner`, dass die
+APK mit dem Upload-Zertifikat signiert ist, dass keine App-Tester-Datei darin liegt und dass
+`AppstoreAuthenticationKey.pem` darin liegt (fehlt sie, bricht es ab; nur für Testbuilds
+übergehbar mit `AIRRELAY_ALLOW_MISSING_PEM=1`).
+
+Upload-Schlüssel (RSA 4096, 30 Jahre, Alias `airrelay`, Zertifikat SHA-256
+`9b305bbd…e449c8`):
+- Keystore: `~/Keys/airrelay/airrelay-upload.jks`, Kopie in iCloud Drive unter
+  `Keys/airrelay/airrelay-upload.jks`.
+- Passwort: macOS-Schlüsselbund, Dienst `airrelay-upload-keystore`, Account `kevin`
+  (`security find-generic-password -s airrelay-upload-keystore -a kevin -w`).
+- Gradle liest das Passwort aus `AIRRELAY_UPLOAD_KEYSTORE_PASSWORD` oder aus
+  `local.properties` (`storePassword`, nicht im Repo), nie aus einer Datei im Repo.
+
+Achtung Testgerät: bisher installierte Builds sind mit dem Debug-Schlüssel signiert. Eine mit
+dem Upload-Schlüssel signierte APK lässt sich darüber nicht installieren, vorher
+`adb uninstall de.merzkevin.airrelay`. Das löscht nur die zwischengespeicherte Abo-Datei.
 
 `packageDebug`/`packageRelease` hängen an den Unit-Tests. Ist ein Test rot (auch der
 Kompatibilitätsvertrag), entsteht keine APK. Ein Build direkt aus Android Studio mit
@@ -80,9 +99,10 @@ Entscheidungen mit mehr als zwei Fällen sind reine Funktionen mit Tabelle:
 `screenFor` (was wird angezeigt, 80 Fälle) und `backActionFor` (Zurück-Taste, 36 Fälle),
 Tabellen in `receiver/src/test/resources/`.
 
-Freischaltung (Phase 2): `LicenseGate.current()` in `core/ScreenDecision.kt` ist die eine
-Stelle. `screenFor` zeigt bei `LOCKED` den Sperrbildschirm, der Dienst holt die App dann
-nicht mehr nach vorn.
+Freischaltung: `accessFor` in `core/Subscription.kt` (64 Fälle, Tabelle
+`access-table.txt`) entscheidet aus Abo-Status, Erreichbarkeit von Amazon, Herkunft und Alter
+des gespeicherten Status und einem abgewiesenen Sender. `LicenseGate` hält das Ergebnis für
+die nativen Threads, `screenFor` zeigt bei `LOCKED` den Abo-Kasten.
 
 ## Verhalten
 
@@ -102,8 +122,110 @@ nicht mehr nach vorn.
 - Kein WLAN, Port-Problem, Startfehler: eigener Bildschirm mit "Erneut versuchen"
   (bei Netzwerk zusätzlich "Netzwerkeinstellungen"). Netzänderungen starten ihn selbst neu.
 - Start beim Booten: ja (abschaltbar ist Phase 2).
-- Gespeichert wird nichts: keine Einstellungen, keine Dateien. Die AirPlay-Identität wird
+- Gespeichert wird genau eine Datei: der zuletzt von Amazon bestätigte Abo-Status
+  (`filesDir/entitlement.txt`, siehe "Abo"). Keine Einstellungen. Die AirPlay-Identität wird
   aus `ANDROID_ID` abgeleitet (stabil pro Installation).
+
+## Abo (Amazon In-App Purchasing)
+
+Ein Abo, zwei Laufzeiten, je 7 Tage Probezeit über Amazon (einmal pro Kunde, Amazon setzt
+das durch). Ohne aktives Abo oder Probezeit keine Spiegelung. Kein eigener Server: die
+Kaufprüfung läuft nur auf dem Gerät (Appstore SDK prüft die signierten Antworten mit
+`AppstoreAuthenticationKey.pem`), keine Receipt Verification Service.
+
+| | SKU | Preis |
+|---|---|---|
+| Eltern-SKU | `de.merzkevin.airrelay.pro` | |
+| Laufzeit monatlich | `de.merzkevin.airrelay.pro.monthly` | 2,49 €, 7 Tage gratis |
+| Laufzeit jährlich | `de.merzkevin.airrelay.pro.yearly` | 14,99 €, 7 Tage gratis |
+
+Die SKUs stehen in `core/Subscription.kt` (`Skus`) und im eingefrorenen Vertrag: eine
+umbenannte SKU verliert jeden bestehenden Abonnenten.
+
+SDK: `com.amazon.device:amazon-appstore-sdk:3.0.9` (Maven Central, 460 KB jar, keine
+Abhängigkeiten, kein eigenes Manifest). R8-Regeln wie von Amazon verlangt
+(`-keep class com.amazon.** {*;}`), das kostet 0,4 MB dex. Manifest: `ResponseReceiver`,
+`PurchasingService`, `<queries>` für Appstore und App Tester.
+
+Ablauf:
+- `registerListener` beim ersten Start (Dienst oder Activity), `getUserData`,
+  `getProductData` (Eltern-SKU plus Laufzeiten) und `getPurchaseUpdates(true)` bei jedem
+  `onResume`. Immer `reset = true`: der Status wird aus der vollständigen Belegliste
+  abgeleitet, Belege werden nicht gespeichert. Nicht während einer laufenden Spiegelung
+  (kostet auf dem Stick Lite bis zu 113 ms Hauptthread beim Nach-vorn-holen), dann wird es
+  nach dem Ende nachgeholt.
+- Kauf mit `purchase(termSku)`. Belege werden nach Beleg-ID zusammengeführt, eine
+  stornierte Kopie gewinnt, `cancelDate` in der Zukunft läuft noch.
+  `notifyFulfillment(receiptId, FULFILLED)` einmal pro Beleg und Prozess; andere Werte sind
+  verboten (sie erstatten sofort, `GuardsExistTest` prüft das).
+- "Kauf wiederherstellen" ist `getPurchaseUpdates(true)` mit sichtbarem Ergebnis.
+- Amazon antwortet nicht binnen 15 s: gilt als nicht erreichbar, mit "Erneut versuchen".
+  Eine spätere Antwort wird trotzdem übernommen.
+- "7 Tage gratis" steht nur da, wenn Amazon diesem Kunden die Probezeit anbietet
+  (`Product.getFreeTrialPeriod()` kommt nur dann). Knopftext ist Leistung plus Preis, kein
+  Kaufbefehl. Preise kommen von Amazon (Marktplatzformat); "1,25 € im Monat, 49 %
+  günstiger" wird daraus berechnet und abgerundet, bei unlesbarem Preis weggelassen.
+- Offline: ein von Amazon bestätigtes Abo gilt bis zu 3 Tage ab der letzten Bestätigung,
+  danach Sperre mit Hinweis. Eine Uhr, die mehr als 10 min vor der Bestätigung steht,
+  gewährt keine Frist.
+
+Ablehnung ohne Abo: UxPlay fragt beim ersten SETUP (nach Pairing und FairPlay, bevor ein
+Stream existiert) `report_client_request`; `android_raop_callbacks.c` fragt Kotlin
+(`onClientRequest`, schlägt im Zweifel zu), Patch `0007` antwortet dann `403 Forbidden`
+statt eines leeren `200 OK`. Das iPhone zeigt seine eigene Fehlermeldung, auf dem Fernseher
+kommt die App mit dem Abo-Kasten und dem Satz "Ein iPhone oder iPad wollte gerade …" nach
+vorn. Eine zugelassene Sitzung läuft zu Ende, auch wenn das Abo währenddessen ausläuft.
+
+Gespeichert (`filesDir/entitlement.txt`, Schlüssel=Wert, handgeschriebener toleranter
+Decoder): `schemaVersion`, `status` (`active`/`trial`/`expired`/`unknown`),
+`confirmedAtMs`. Unbekannte Schlüssel einer neueren Version bleiben beim Schreiben erhalten.
+Schreiben: temporäre Datei, sync, alte Datei als `.bak`, umbenennen, zurücklesen. Ein
+Lesefehler gilt als "unbekannt" (dann wird Amazon gefragt), nie als "kein Abo"; eine
+kaputte Datei wird nach `entitlement.txt.corrupt-<zeit>` verschoben (höchstens 3), nie
+gelöscht. Eingefrorene Altdateien: `src/test/resources/.../fixtures/`.
+
+Debug-Build ohne Amazon (Zustände und Meldungen ansehen, Preise sind erfunden):
+```
+adb shell am start -n de.merzkevin.airrelay/.MainActivity --es debug_subscription EXPIRED
+# ACTIVE | EXPIRED | EXPIRED_NO_TRIAL | EXPIRED_NO_PRICES | CHECKING | UNREACHABLE | OVERDUE | OVERDUE_IN_GRACE
+adb shell am start -n de.merzkevin.airrelay/.MainActivity --es debug_message PURCHASE_CANCELLED
+adb shell am start -n de.merzkevin.airrelay/.MainActivity --es debug_locale en   # "system" zurück
+```
+Die Debug-Zuspielung fragt vorher dieselbe Freischaltung wie ein iPhone-SETUP.
+
+### Was vor der ersten Einreichung noch fehlt (Amazon-Konto)
+
+1. In der Konsole unter der App "AirRelay" ein Abo anlegen: Eltern-SKU
+   `de.merzkevin.airrelay.pro`, Laufzeiten `de.merzkevin.airrelay.pro.monthly` (monatlich,
+   2,49 €) und `de.merzkevin.airrelay.pro.yearly` (jährlich, 14,99 €), bei beiden
+   Probezeit "7 Tage". Die SKUs müssen Zeichen für Zeichen so heißen; weicht die Konsole
+   ab, ist der Code falsch, nicht die Konsole (Vertrag neu einfrieren, bevor irgendwer
+   gekauft hat).
+2. `AppstoreAuthenticationKey.pem` (Konsole, App, "Upload Your App File", "View public
+   key") nach `../store/amazon/AppstoreAuthenticationKey.pem` legen und
+   `tools/build_release.sh` starten: das Skript kopiert sie nach
+   `receiver/src/main/assets/`, baut, prüft, dass sie in der APK liegt. Die Datei ist ein
+   öffentlicher Schlüssel und gehört ins Repo (committen).
+3. Zum Testen vor der Freigabe: Live App Testing (braucht die PEM) oder App Tester (siehe
+   unten).
+
+### Kauf testen mit dem Amazon App Tester
+
+Kein Entwicklerkonto nötig, aber der Stick verlangt für die Installation die
+Kindersicherungs-PIN (am 30.09.2026 daran gescheitert). App Tester arbeitet nur mit dem
+Debug-Build:
+```
+# App Tester im Appstore des Sticks installieren (PIN), dann:
+adb shell appops set com.amazon.sdktestclient SYSTEM_ALERT_WINDOW allow
+adb shell setprop debug.amazon.sandboxmode debug
+adb push tools/amazon/amazon.sdktester.json /sdcard/amazon.sdktester.json
+adb install -r receiver/build/outputs/apk/debug/receiver-debug.apk
+# danach: adb shell setprop debug.amazon.sandboxmode none
+```
+`tools/amazon/amazon.sdktester.json` liegt bewusst außerhalb von `src/`, `build_release.sh`
+prüft, dass sie nicht in der APK landet. Sobald die Abo-Artikel in der Konsole stehen,
+durch den JSON-Export der Konsole ersetzen (der Wert `term` für die Jahreslaufzeit ist
+nicht gegen Amazon geprüft).
 
 ## Messwerte (Fire TV Stick Lite AFTSS, Fire OS 7.7, 30.09.2026)
 
@@ -124,10 +246,17 @@ Fensterpuffer). Das Videobild läuft davon unberührt über die SurfaceView.
 Zeit bis zum ersten Bild (Debug-Zuspielung, nicht iPhone): App im Vordergrund 0,54 s,
 App im Hintergrund (inklusive Nach-vorn-holen) 1,03 s.
 
-Tests: 68 JVM-Tests. Gegenprobe mit `tools/mutation_check.py`: 39 Absicherungen einzeln
-entfernt, alle 39 machen die Tests rot (zwei Lücken wurden dabei gefunden und geschlossen).
-Build-Sperre in beiden Richtungen geprüft: mit gebrochenem Vertrag endet `assembleRelease`
-mit 1 und es entsteht keine APK, mit heilem mit 0.
+Mit Abo (30.09.2026, Release mit Upload-Schlüssel, Stick Lite): APK 5,53 MB (dex 0,46 MB,
+davon rund 0,4 MB Appstore SDK), PSS im Vordergrund nach 60 s 13,3 MB (Stand davor am selben
+Tag 13,0 MB). Zeit bis zum ersten Bild aus dem Hintergrund (Debug-Zuspielung, je 7 Läufe):
+Median 1,83 s mit Abo-Code, 1,91 s mit dem Stand davor; die Streuung (1,06 bis 2,67 s) hat
+der Stick an diesem Tag unabhängig davon.
+
+Tests: 115 JVM-Tests. Gegenprobe mit `tools/mutation_check.py`: 72 Absicherungen einzeln
+entfernt, jede macht die Tests rot (dabei gefunden und geschlossen: ein Dienst, der jeden
+Sender zulässt, fiel dem Wächter nicht auf). Build-Sperre in beiden Richtungen geprüft: mit
+gebrochenem Vertrag (Abo-Datei in anderem Verzeichnis) endet `assembleRelease` mit 1 und es
+entsteht keine APK, mit heilem mit 0.
 
 ## Bildrate
 
@@ -173,25 +302,56 @@ protokolliert PSS und CPU alle 5 s in eine CSV und gibt am Ende die Zeit von
 ## Fire OS 8 (Android 11)
 
 Auf Fire OS 7 (Android 9) darf der Vordergrunddienst die App selbst nach vorn holen,
-auf dem Stick geprüft. Ab Android 10 sperrt das System Activity-Starts aus dem Hintergrund.
-Wege, die dort bleiben:
+auf dem Stick geprüft. Ab Android 10 ignoriert das System solche Starts aus dem Hintergrund.
 
-1. Berechtigung "Über anderen Apps einblenden" (`SYSTEM_ALERT_WINDOW`). Mit ihr sind
-   Hintergrundstarts erlaubt. Fire OS hat dafür keine gut erreichbare Einstellung, per adb
-   geht `adb shell appops set <appId> SYSTEM_ALERT_WINDOW allow`. Für Kundinnen und Kunden
-   ungeeignet, außer Fire OS 8 bietet den Schalter an (am Gerät prüfen).
-2. Benachrichtigung mit Full-Screen-Intent (`USE_FULL_SCREEN_INTENT`, Kategorie CALL oder
-   ALARM). Auf Telefonen der übliche Weg; ob die Fire-TV-Oberfläche sie als Vollbild startet,
-   ist ungeprüft.
-3. Fallback ohne Sonderrechte: solange die App im Vordergrund ist, läuft alles wie auf
-   Fire OS 7. Liegt sie im Hintergrund, spielt der Ton, und die Benachrichtigung öffnet
-   das Bild. Der Wartebildschirm sollte dann darauf hinweisen, die App vor dem Spiegeln
-   zu öffnen.
+Eingebaut (`needsFullScreenAlert`, ab API 29): der Dienst versucht den Start wie bisher und
+zeigt zusätzlich eine Benachrichtigung mit Full-Screen-Intent (`USE_FULL_SCREEN_INTENT`,
+Kanal `open_request`, Kategorie CALL, verschwindet nach 60 s). Kommt die App doch nach vorn,
+nimmt sie die Benachrichtigung sofort weg. Gilt für "iPhone spiegelt" und für "iPhone ohne Abo
+abgewiesen". Auf Fire OS 7 ändert sich nichts: kein Kanal, keine Benachrichtigung.
 
-Empfehlung: auf einem Fire-OS-8-Gerät zuerst Weg 2 testen, dann Weg 1; bis dahin bleibt
-Weg 3 der sichere Stand. Außerdem gilt ab Android 11: `NetworkInterface`-MAC ist gesperrt
-(hier ohnehin nicht benutzt) und Vordergrunddienste brauchen den Typ `connectedDevice`
-(gesetzt).
+UNGEPRÜFT: es gibt kein Fire-OS-8-Gerät. Ob die Fire-TV-Oberfläche einen Full-Screen-Intent
+als Vollbild startet oder nur als Hinweis zeigt, weiß erst ein Test auf dem Gerät. Im
+schlechtesten Fall läuft der Ton, und die Benachrichtigung öffnet das Bild. Weitere Wege,
+falls nötig: "Über anderen Apps einblenden" (`SYSTEM_ALERT_WINDOW`, per adb
+`appops set <appId> SYSTEM_ALERT_WINDOW allow`, für Kundinnen und Kunden kaum erreichbar).
+Ab Android 11 gilt außerdem: Vordergrunddienste brauchen den Typ `connectedDevice` (gesetzt).
+
+## Fire-TV-Einreichungskriterien (Amazon Test Criteria, Stand 18.09.2026)
+
+| Kriterium | Stand |
+|---|---|
+| `uses-feature android.hardware.touchscreen required=false` | erfüllt |
+| `LEANBACK_LAUNCHER`, `uses-feature android.software.leanback required=false` | erfüllt |
+| Banner (`android:banner`) | erfüllt (`drawable-xhdpi/banner.png`), Größe nicht gegen Amazon geprüft |
+| Nur mit D-Pad bedienbar, sichtbarer Fokus, keine Fokusfalle | erfüllt, auf dem Stick durchgegangen (Abo-Kasten, Lizenzen, Fehler) |
+| Keine Touch-Elemente | erfüllt |
+| Zurück: kein Absturz, keine Schleife | erfüllt (`backActionFor`, 36 Fälle) |
+| Home führt zum Launcher, App hängt nicht | erfüllt (Home beim Spiegeln: Ton läuft weiter) |
+| Keine Google-Dienste | erfüllt, keine Google-Bibliothek, keine AndroidX |
+| Keine verbotenen Berechtigungen (Telefonstatus, Standort, Mikrofon, Kamera) | erfüllt |
+| Querformat, 90 % Fläche, Textgröße ab 14 sp | erfüllt (kleinster Text 15 sp) |
+| Ladeanzeige über 15 s | erfüllt ("Abo wird geprüft …", nach 15 s Ausgang "Erneut versuchen") |
+| Daten und Käufe überstehen ein Update | erfüllt (Kauf liegt bei Amazon, Status-Datei tolerant, Vertragstest) |
+| Schreiblast unter 2 MB/h im Hintergrund | erfüllt (eine Datei unter 100 Byte bei Statusänderung) |
+| targetSdk (Fire OS 8 verlangt 30) | erfüllt (36) |
+| 64 bit: arm64-v8a und armeabi-v7a | erfüllt |
+| APK-Signaturschema v2 | erfüllt (`apksigner verify`: v2; v1 entfällt bei minSdk 24) |
+| minSdk 22 für alle Fire-TV-Geräte | NICHT erfüllt: minSdk 24 (Fire OS 6 und neuer). Fire OS 5 (Fire TV 1./2. Generation) bewusst ausgelassen |
+| IAP: Preis und Produkt aus der IAP-API, kein eigener Bestätigungsdialog vor dem Kauf | erfüllt (keine eigene Kaufbestätigung, nur Wiederherstellung und Abbruch zeigen eigene Meldungen) |
+| `AppstoreAuthenticationKey.pem` in `assets/` | offen, kommt aus der Konsole (siehe oben) |
+
+## Testliste für Kevin (iPhone, nur so prüfbar)
+
+1. Release installieren (vorher `adb uninstall de.merzkevin.airrelay`, Signatur wechselt).
+2. Ohne Abo: am iPhone spiegeln. Erwartung: iPhone meldet "konnte nicht verbinden" binnen
+   weniger Sekunden, kein halbes Bild, kein Hängen; der Fernseher zeigt den Abo-Kasten mit
+   "Ein iPhone oder iPad wollte gerade …". Einmal mit App im Vordergrund, einmal nach Home.
+3. Dasselbe mit Musik (AirPlay-Audio statt Spiegeln): ebenfalls abgewiesen.
+4. Nach Freischaltung (App Tester oder Live App Testing): spiegeln wie bisher, kein Hinweis.
+5. Abo aktiv, Stick vom Internet trennen (WLAN ohne Internet): spiegeln geht weiter; nach
+   mehr als 3 Tagen ohne Bestätigung kommt "Dein Abo muss bestätigt werden".
+6. Zweimal Zurück beim Spiegeln, Home beim Spiegeln: wie bisher.
 
 ## Bekannte Grenzen
 
