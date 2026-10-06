@@ -2,12 +2,26 @@ application-id: de.merzkevin.airrelay
 code-package: de.merzkevin.airrelay
 component: activity .MainActivity [android.intent.action.MAIN,android.intent.category.LAUNCHER,android.intent.category.LEANBACK_LAUNCHER]
 component: service .ReceiverService []
+component: receiver com.amazon.device.iap.ResponseReceiver []
+component: service com.amazon.device.iap.PurchasingService []
 component: receiver .BootReceiver [android.intent.action.BOOT_COMPLETED]
 notification-channel: receiver
+notification-channel: open_request
 dns-sd-type: _airplay._tcp
 dns-sd-type: _raop._tcp
 reads-setting: global/device_name
-persistence: none
+persistence: filesDir
+stored-file: filesDir/entitlement.txt
+stored-key: entitlement.txt schemaVersion number
+stored-key: entitlement.txt status enum
+stored-key: entitlement.txt confirmedAtMs number
+stored-value: entitlement.txt status=active
+stored-value: entitlement.txt status=trial
+stored-value: entitlement.txt status=expired
+stored-value: entitlement.txt status=unknown
+iap-sku: parent de.merzkevin.airrelay.pro
+iap-sku: term de.merzkevin.airrelay.pro.monthly
+iap-sku: term de.merzkevin.airrelay.pro.yearly
 device-id("3f2a9c01d4e5b6a7"): 62:40:D4:9A:D3:FA
 device-id("0123456789abcdef"): 8E:61:8F:51:AD:E7
 device-id(""): 0A:53:50:49:45:47

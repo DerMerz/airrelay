@@ -72,11 +72,12 @@ int android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject cal
     ctx->on_conn_init = (*env)->GetMethodID(env, cls, "onConnectionInit", "()V");
     ctx->on_conn_destroy = (*env)->GetMethodID(env, cls, "onConnectionDestroy", "()V");
     ctx->on_mirror_running = (*env)->GetMethodID(env, cls, "onMirrorRunning", "(Z)V");
+    ctx->on_client_request = (*env)->GetMethodID(env, cls, "onClientRequest", "()Z");
     (*env)->DeleteLocalRef(env, cls);
 
     if (!ctx->on_video_data || !ctx->on_audio_format || !ctx->on_volume ||
         !ctx->on_client_volume || !ctx->on_audio_teardown || !ctx->on_conn_init ||
-        !ctx->on_conn_destroy || !ctx->on_mirror_running) {
+        !ctx->on_conn_destroy || !ctx->on_mirror_running || !ctx->on_client_request) {
         /* GetMethodID leaves a NoSuchMethodError pending */
         _clear_exception(env);
         LOGE("callback method missing, check the R8 keep rules for NativeCallbacks");
@@ -190,6 +191,29 @@ static void _mirror_video_running(void *cls, bool running) {
     _clear_exception(env);
 }
 
+/*
+ * First SETUP of a session, after pairing and FairPlay, before any stream is set up.
+ * Kotlin decides whether this sender may start (subscription). A refused sender gets
+ * "403 Forbidden" (patch 0007) and no stream is ever created, so the iPhone shows its
+ * own "could not connect" message instead of a half picture. Fails closed: without an
+ * answer from Kotlin the sender is refused.
+ */
+static void _report_client_request(void *cls, char *deviceid, char *model, char *name, bool *admit) {
+    /* sender strings stay native: an iPhone name with emoji is not valid modified UTF-8 */
+    (void)deviceid; (void)name;
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    *admit = false;
+    JNIEnv *env = _get_env(ctx);
+    if (!env) return;
+    jboolean ok = (*env)->CallBooleanMethod(env, ctx->callback_obj, ctx->on_client_request);
+    if ((*env)->ExceptionCheck(env)) {
+        _clear_exception(env);
+        ok = JNI_FALSE;
+    }
+    *admit = ok == JNI_TRUE;
+    LOGI("sender %s (%s)", *admit ? "admitted" : "refused, no subscription", model ? model : "?");
+}
+
 /* only H.264 is announced (feature bit 42 off); refuse H.265 if a sender tries anyway */
 static int _video_set_codec(void *cls, video_codec_t codec) {
     (void)cls;
@@ -261,6 +285,7 @@ void android_callbacks_fill(raop_callbacks_t *cbs, android_callback_ctx_t *ctx) 
     cbs->mirror_video_running = _mirror_video_running;
     cbs->display_pin = _display_pin;
     cbs->video_set_codec = _video_set_codec;
+    cbs->report_client_request = _report_client_request;
     cbs->on_video_play = _video_play;
     cbs->on_video_scrub = _video_scrub;
     cbs->on_video_rate = _video_rate;

@@ -18,18 +18,32 @@ val localProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use(::load)
 }
 
+// Release signing with the upload key. The keystore lives outside the repository
+// (~/Keys/airrelay, copy in iCloud Drive), its password comes from the environment
+// (AIRRELAY_UPLOAD_KEYSTORE_PASSWORD, see tools/build_release.sh which reads it from the
+// macOS keychain) or from local.properties (git-ignored). Never from a file in the repo.
+val uploadStore: File = (System.getenv("AIRRELAY_UPLOAD_KEYSTORE") ?: localProps.getProperty("storeFile"))
+    ?.let { File(it) } ?: File(System.getProperty("user.home"), "Keys/airrelay/airrelay-upload.jks")
+val uploadPassword: String? = System.getenv("AIRRELAY_UPLOAD_KEYSTORE_PASSWORD") ?: localProps.getProperty("storePassword")
+val uploadKeyReady = uploadStore.isFile && !uploadPassword.isNullOrEmpty()
+// tools/build_release.sh sets this: a store build must never fall back to the debug key
+if (System.getenv("AIRRELAY_REQUIRE_UPLOAD_KEY") == "1" && !uploadKeyReady) {
+    throw GradleException("upload key not available: $uploadStore / AIRRELAY_UPLOAD_KEYSTORE_PASSWORD")
+}
+
 android {
     namespace = "de.merzkevin.airrelay"
     compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     signingConfigs {
-        if (localProps.containsKey("storeFile")) {
+        if (uploadKeyReady) {
             create("release") {
-                storeFile = file(localProps.getProperty("storeFile"))
-                storePassword = localProps.getProperty("storePassword")
-                keyAlias = localProps.getProperty("keyAlias")
-                keyPassword = localProps.getProperty("keyPassword")
+                storeFile = uploadStore
+                storePassword = uploadPassword
+                keyAlias = localProps.getProperty("keyAlias") ?: "airrelay"
+                // PKCS12: key and store share one password
+                keyPassword = localProps.getProperty("keyPassword") ?: uploadPassword
             }
         }
     }
@@ -66,8 +80,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            // without a release key in local.properties the release build is signed with the
-            // local debug key, so it can be installed for measurements; never for the store
+            // without the upload key the release build is signed with the local debug key, so
+            // it can be installed for measurements; never for the store (build_release.sh
+            // refuses that)
             signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
@@ -144,5 +159,8 @@ tasks.withType<Zip>().configureEach {
 }
 
 dependencies {
+    // Amazon Appstore SDK (In-App Purchasing v3): a plain 460 KB jar from Maven Central, no
+    // transitive dependencies, no manifest of its own (entries are in AndroidManifest.xml).
+    implementation("com.amazon.device:amazon-appstore-sdk:3.0.9")
     testImplementation("junit:junit:4.13.2")
 }

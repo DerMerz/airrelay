@@ -94,7 +94,27 @@ class DecisionTablesTest {
     }
 
     @Test
-    fun everyDeviceIsUnlockedUntilPhaseTwo() {
-        assertEquals(Entitlement.UNLOCKED, LicenseGate.current())
+    fun gateStartsClosedAndFollowsTheSubscription() {
+        val initial = LicenseGate.access
+        // before the stored or fresh status is known, no sender gets in
+        assertEquals(Access.CHECKING, initial)
+        assertEquals(Entitlement.LOCKED, LicenseGate.current())
+        try {
+            for (a in Access.entries) {
+                LicenseGate.access = a
+                assertEquals(a.name, if (a == Access.UNLOCKED) Entitlement.UNLOCKED else Entitlement.LOCKED, LicenseGate.current())
+                assertEquals(a.name, a == Access.UNLOCKED, LicenseGate.admitsSender())
+            }
+        } finally {
+            LicenseGate.access = initial
+        }
+    }
+
+    @Test
+    fun fullScreenAlertOnlyFromAndroid10() {
+        // Fire OS 7 (28) keeps the plain start; Fire OS 8 (30) gets the alert as well
+        val table = mapOf(24 to false, 25 to false, 28 to false, 29 to true, 30 to true, 34 to true)
+        for ((sdk, want) in table) assertEquals("sdk $sdk", want, needsFullScreenAlert(sdk))
+        assertEquals(6, table.size)
     }
 }

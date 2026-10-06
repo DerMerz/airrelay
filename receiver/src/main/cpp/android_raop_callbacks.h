@@ -26,6 +26,7 @@ typedef struct {
     jmethodID on_conn_init;
     jmethodID on_conn_destroy;
     jmethodID on_mirror_running;
+    jmethodID on_client_request;
     AudioEngine *audio_engine;
 } android_callback_ctx_t;
 

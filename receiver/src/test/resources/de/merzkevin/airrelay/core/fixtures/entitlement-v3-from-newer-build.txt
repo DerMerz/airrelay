@@ -1,0 +1,5 @@
+schemaVersion=3
+status=grace-period
+confirmedAtMs=1790000000000
+lastTermSku=de.merzkevin.airrelay.pro.yearly
+futureFlag=a=b

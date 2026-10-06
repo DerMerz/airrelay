@@ -22,4 +22,8 @@ interface NativeCallbacks {
     fun onConnectionInit()
     fun onConnectionDestroy()
     fun onMirrorRunning(running: Boolean)
+
+    /** First SETUP of a sender, before any stream exists: true admits it, false makes the
+     *  native side answer "403 Forbidden". Called on a UxPlay thread, must not block. */
+    fun onClientRequest(): Boolean
 }

@@ -9,5 +9,13 @@
     public void onConnectionInit();
     public void onConnectionDestroy();
     public void onMirrorRunning(boolean);
+    public boolean onClientRequest();
 }
 -keep class de.merzkevin.airrelay.bridge.NativeBridge { native <methods>; }
+
+# Amazon Appstore SDK, rules as given by Amazon (iap-obfuscate-the-code): the SDK finds
+# its own classes by name and checks signed answers; obfuscating it breaks purchases
+# (AUTH_TOKEN_VERIFICATION_FAILURE).
+-dontwarn com.amazon.**
+-keep class com.amazon.** {*;}
+-keepattributes *Annotation*

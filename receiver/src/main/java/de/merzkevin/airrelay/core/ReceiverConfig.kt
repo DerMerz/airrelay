@@ -37,3 +37,10 @@ fun startOutcome(ip: String?, nativeReady: Boolean, boundPort: Int?): ServerStat
     boundPort == null -> ServerStatus.PORT_IN_USE
     else -> ServerStatus.RUNNING
 }
+
+/**
+ * Android 10 (API 29, Fire OS 8) and newer ignore activity starts from the background, so
+ * the service also posts a full-screen notification there. Fire OS 7 (API 28) keeps the
+ * plain start, unchanged.
+ */
+fun needsFullScreenAlert(sdkInt: Int): Boolean = sdkInt >= 29

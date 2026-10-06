@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -9,6 +10,14 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Fire OS 8 (Android 11): the only way back to the front from the background -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- Android 11+: package visibility for the Appstore and Amazon's App Tester -->
+    <queries>
+        <package android:name="com.amazon.venezia" />
+        <package android:name="com.amazon.sdktestclient" />
+    </queries>
 
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
@@ -38,6 +47,21 @@
             android:name=".ReceiverService"
             android:exported="false"
             android:foregroundServiceType="connectedDevice" />
+
+        <!-- Amazon In-App Purchasing (Appstore SDK 3.x): answers of the Appstore -->
+        <receiver
+            android:name="com.amazon.device.iap.ResponseReceiver"
+            android:exported="true"
+            android:permission="com.amazon.inapp.purchasing.Permission.NOTIFY">
+            <intent-filter>
+                <action android:name="com.amazon.inapp.purchasing.NOTIFY" />
+            </intent-filter>
+        </receiver>
+
+        <service
+            android:name="com.amazon.device.iap.PurchasingService"
+            android:exported="true"
+            tools:ignore="ExportedService" />
 
         <receiver
             android:name=".BootReceiver"

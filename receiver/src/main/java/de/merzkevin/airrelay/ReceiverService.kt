@@ -28,6 +28,7 @@ import android.os.SystemClock
 import android.provider.Settings
 import android.util.Log
 import android.view.Display
+import de.merzkevin.airrelay.billing.Subscriptions
 import de.merzkevin.airrelay.bridge.NativeBridge
 import de.merzkevin.airrelay.bridge.NativeCallbacks
 import de.merzkevin.airrelay.core.Entitlement
@@ -39,6 +40,7 @@ import de.merzkevin.airrelay.core.Size
 import de.merzkevin.airrelay.core.advertisedSize
 import de.merzkevin.airrelay.core.airplayVolumeToGainQ15
 import de.merzkevin.airrelay.core.deviceIdFor
+import de.merzkevin.airrelay.core.needsFullScreenAlert
 import de.merzkevin.airrelay.core.pickIpv4
 import de.merzkevin.airrelay.core.receiverName
 import de.merzkevin.airrelay.core.startOutcome
@@ -97,6 +99,8 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     override fun onCreate() {
         super.onCreate()
         startInForeground()
+        // before the server: the gate must know the stored status when the first sender comes
+        Subscriptions.init(this)
         serverThread = HandlerThread("server").apply { start() }
         server = Handler(serverThread.looper)
         renderer = VideoRenderer(this, codecSize())
@@ -299,6 +303,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
             val new = change(old)
             if (new == old) return
             state = new
+            sessionRunning = new.mirroring
             wakeChange = old.needsWakeLock != new.needsWakeLock
             if (notifyPending) return@synchronized
             notifyPending = true
@@ -334,12 +339,27 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         }
     }
 
+    /**
+     * First SETUP of a sender (UxPlay thread). Without a subscription the sender is refused
+     * before any stream exists (native side answers 403), and the TV shows why.
+     * A session that was admitted keeps running even if the subscription runs out during it.
+     */
+    override fun onClientRequest(): Boolean {
+        val admitted = LicenseGate.admitsSender()
+        if (!admitted) {
+            Log.i(TAG, "sender refused: ${LicenseGate.access}")
+            Subscriptions.onSenderRefused()
+            main.post { bringToFront(FrontReason.SENDER_REFUSED) }
+        }
+        return admitted
+    }
+
     override fun onMirrorRunning(running: Boolean) {
         Log.i(TAG, "Mirroring ${if (running) "started" else "stopped"} at ${SystemClock.elapsedRealtime()} ms")
         if (running) {
             renderer.startSession()
             update { it.copy(mirroring = true, firstFrameShown = false, videoSize = null) }
-            main.post { bringToFront() }
+            main.post { bringToFront(FrontReason.MIRRORING) }
         } else {
             renderer.stopSession()
             update { it.copy(mirroring = false, firstFrameShown = false, videoSize = null) }
@@ -381,16 +401,50 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
 
     // ---- helpers ----
 
-    private fun bringToFront() {
-        if (LicenseGate.current() != Entitlement.UNLOCKED) return
-        if (!state.mirroring) return
+    private enum class FrontReason { MIRRORING, SENDER_REFUSED }
+
+    private fun bringToFront(reason: FrontReason) {
+        when (reason) {
+            FrontReason.MIRRORING -> if (LicenseGate.current() != Entitlement.UNLOCKED || !state.mirroring) return
+            FrontReason.SENDER_REFUSED -> if (LicenseGate.current() == Entitlement.UNLOCKED) return
+        }
         // Allowed from a foreground service up to Android 9 (Fire OS 7). Android 10+
-        // blocks background activity starts, see README "Fire OS 8".
+        // (Fire OS 8) ignores it while the app is in the background; there the full-screen
+        // notification is the way back (README "Fire OS 8"). If the start does work, the
+        // activity removes the notification again as soon as it is visible.
         try {
             startActivity(Intent(this, MainActivity::class.java)
                 .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
         } catch (e: Exception) {
             Log.w(TAG, "could not bring the app to the front", e)
+        }
+        if (needsFullScreenAlert(Build.VERSION.SDK_INT) && !MainActivity.visible) showOpenAlert(reason)
+    }
+
+    /** Android 10+: high-priority notification with a full-screen intent that opens the app. */
+    private fun showOpenAlert(reason: FrontReason) {
+        try {
+            val nm = getSystemService(NotificationManager::class.java)
+            nm.createNotificationChannel(NotificationChannel(
+                ALERT_CHANNEL_ID, getString(R.string.alert_channel), NotificationManager.IMPORTANCE_HIGH))
+            val open = PendingIntent.getActivity(this, 1,
+                Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+            val text = if (reason == FrontReason.MIRRORING) R.string.alert_mirroring else R.string.alert_refused
+            val n = Notification.Builder(this, ALERT_CHANNEL_ID)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(getString(R.string.app_name))
+                .setContentText(getString(text))
+                .setCategory(Notification.CATEGORY_CALL)
+                .setFullScreenIntent(open, true)
+                .setContentIntent(open)
+                .setAutoCancel(true)
+                .setTimeoutAfter(ALERT_TIMEOUT_MS)
+                .build()
+            nm.notify(ALERT_NOTIFICATION_ID, n)
+        } catch (e: Exception) {
+            Log.w(TAG, "could not show the open alert", e)
         }
     }
 
@@ -426,11 +480,19 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         private const val TAG = "AirRelayService"
         private const val CHANNEL_ID = "receiver"
         private const val NOTIFICATION_ID = 1
+        /** Android 10+ only: full-screen "open the app" alert (Fire OS 8). */
+        private const val ALERT_CHANNEL_ID = "open_request"
+        const val ALERT_NOTIFICATION_ID = 2
+        private const val ALERT_TIMEOUT_MS = 60_000L
         private const val SERVER_JOIN_MS = 2000L
         /** Safety net only; released as soon as the session ends. */
         private const val WAKE_LOCK_MAX_MS = 6 * 60 * 60 * 1000L
         /** Settings.Global.DEVICE_NAME (constant is API 25, the key exists on Fire OS 6 too). */
         const val DEVICE_NAME_SETTING = "device_name"
+
+        /** A mirror session is running (the activity skips the Amazon calls then). */
+        @Volatile var sessionRunning = false
+            private set
 
         fun start(context: Context) {
             val intent = Intent(context, ReceiverService::class.java)

@@ -16,9 +16,12 @@ import java.io.File
  * the frozen copy in contract/compat-contract.txt.
  *
  * What survives an update of this app:
- *  - stored data: none. No SharedPreferences, no files, no database. Any persistence API
- *    that appears in src/main shows up here and fails the test until it is frozen on
- *    purpose (and then needs its own old-data fixture test).
+ *  - stored data: exactly one file, the cached subscription status
+ *    (filesDir/entitlement.txt, EntitlementCache). Its keys, value kinds and raw status
+ *    values come from the real encoder, not from a list; old files are pinned by the
+ *    hand-written fixtures in EntitlementCacheTest. Any other persistence API that appears
+ *    in src/main shows up here and fails the test until it is frozen on purpose.
+ *  - the subscription SKUs: a renamed SKU loses every existing subscriber.
  *  - the AirPlay identity (device id and the pairing key UxPlay derives from it): a change
  *    makes every iPhone list the TV as a new device.
  *  - applicationId, launcher/boot components, notification channel id, dns-sd types.
@@ -87,6 +90,31 @@ class CompatContractTest {
     }
 
     @Test
+    fun detectorSeesARenamedStoredKeyAndARemovedStatusValue() {
+        // the encoder is the source: a key renamed there is a different file on disk
+        val lines = CompatContract.build(moduleDir).lines()
+        for (key in listOf(EntitlementCache.KEY_SCHEMA, EntitlementCache.KEY_STATUS, EntitlementCache.KEY_CONFIRMED_AT)) {
+            assertTrue("contract misses stored key $key", lines.any { it.startsWith("stored-key: entitlement.txt $key ") })
+        }
+        for (raw in listOf("active", "trial", "expired", "unknown")) {
+            assertTrue("contract misses status value $raw", "stored-value: entitlement.txt status=$raw" in lines)
+        }
+        assertTrue("stored-file: filesDir/entitlement.txt" in lines)
+    }
+
+    @Test
+    fun detectorSeesAMovedStoreFile() {
+        // the August 2026 incident in another app: same file, other container
+        val tmp = copyModule()
+        val f = File(tmp, "src/main/java/de/merzkevin/airrelay/billing/Subscriptions.kt")
+        f.writeText(f.readText().replace("EntitlementStore(app.filesDir)", "EntitlementStore(app.noBackupFilesDir)"))
+        val changed = CompatContract.build(tmp)
+        assertTrue(changed, changed.contains("stored-file: noBackupFilesDir/entitlement.txt"))
+        assertTrue(!changed.contains("stored-file: filesDir/entitlement.txt"))
+        tmp.deleteRecursively()
+    }
+
+    @Test
     fun harmlessCodeChangesDoNotTouchTheContract() {
         val tmp = copyModule()
         File(tmp, "src/main/java/Y.kt").writeText("class Y { val cache = HashMap<String, Int>() }")
@@ -138,6 +166,28 @@ object CompatContract {
         val found = PERSISTENCE_APIS.filter { api -> Regex("\\b$api\\b").containsMatchIn(all) }
         if (found.isEmpty()) lines += "persistence: none"
         else found.sorted().forEach { lines += "persistence: $it" }
+
+        // the stored subscription status: where, which keys of which kind, which raw values
+        // call sites only ("EntitlementStore(app.filesDir)"), not the class declaration
+        Regex("EntitlementStore\\(([\\w.]+)\\)").findAll(all).map { it.groupValues[1].substringAfterLast('.') }
+            .toSortedSet()
+            .forEach { lines += "stored-file: $it/${EntitlementCache.FILE_NAME}" }
+        val sample = EntitlementCache.encode(CachedEntitlement(SubscriptionStatus.ACTIVE, 1_790_000_000_000L))
+        for (line in sample.lines().filter { it.isNotBlank() }) {
+            val key = line.substringBefore('=')
+            val value = line.substringAfter('=')
+            val kind = when {
+                key == EntitlementCache.KEY_STATUS -> "enum"
+                value.matches(Regex("-?\\d+")) -> "number"
+                else -> "string"
+            }
+            lines += "stored-key: ${EntitlementCache.FILE_NAME} $key $kind"
+        }
+        EntitlementCache.STATUS_RAW.values.forEach { lines += "stored-value: ${EntitlementCache.FILE_NAME} status=$it" }
+
+        lines += "iap-sku: parent ${Skus.PARENT}"
+        lines += "iap-sku: term ${Skus.MONTHLY}"
+        lines += "iap-sku: term ${Skus.YEARLY}"
 
         // identity: pinned samples of the real function
         for (id in listOf("3f2a9c01d4e5b6a7", "0123456789abcdef", "")) {

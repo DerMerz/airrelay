@@ -13,4 +13,7 @@
     <color name="focus_text">#FF0A1020</color>
     <color name="chip_fill">#1FFFFFFF</color>
     <color name="overlay">#CC0A1020</color>
+    <color name="offer_fill">#14FFFFFF</color>
+    <!-- accent that stays readable on the white focus fill -->
+    <color name="focus_accent">#FF1E5FC2</color>
 </resources>

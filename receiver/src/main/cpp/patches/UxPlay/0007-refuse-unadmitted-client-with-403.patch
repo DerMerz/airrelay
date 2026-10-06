@@ -1,0 +1,14 @@
+diff --git a/lib/raop_handlers.h b/lib/raop_handlers.h
+--- a/lib/raop_handlers.h
++++ b/lib/raop_handlers.h
+@@ -765,7 +765,9 @@
+         plist_mem_free(name);
+         name = NULL;
+         if (admit_client == false) {
+-            /* client is not authorized to connect */
++            /* client is not authorized to connect: say so, instead of an empty "200 OK"
++               that leaves the sender waiting for a session that never comes */
++            http_response_init(response, "RTSP/1.0", 403, "Forbidden");
+             plist_free(res_root_node);
+             plist_free(req_root_node);
+             return;

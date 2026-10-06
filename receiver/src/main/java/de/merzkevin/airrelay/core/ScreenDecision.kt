@@ -15,10 +15,9 @@ enum class ServerStatus {
 }
 
 /**
- * Whether this device may use the receiver.
- *
- * Phase 2 (Amazon subscription with a 7 day trial) plugs in here: [LicenseGate.current]
- * decides, [screenFor] shows. Until then every device is [UNLOCKED].
+ * Whether this device may use the receiver: the coarse form of [Access]
+ * ([accessFor], Amazon subscription with a 7 day trial). [LicenseGate.current] decides,
+ * [screenFor] shows.
  */
 enum class Entitlement { UNLOCKED, LOCKED }
 
@@ -74,7 +73,16 @@ fun Screen.showsVideo(): Boolean = this == Screen.CONNECTING || this == Screen.M
 fun Screen.isError(): Boolean =
     this == Screen.NO_NETWORK || this == Screen.PORT_IN_USE || this == Screen.START_FAILED
 
-/** Phase 2 hook: the subscription check goes here. */
+/**
+ * The one place the receiver asks "may a sender start?". Written by the subscription code
+ * (billing/Subscriptions) on the main thread, read from UxPlay threads.
+ * Starts closed: until the stored or fresh status is known, nobody is admitted.
+ */
 object LicenseGate {
-    fun current(): Entitlement = Entitlement.UNLOCKED
+    @Volatile var access: Access = Access.CHECKING
+
+    fun current(): Entitlement = access.entitlement()
+
+    /** The decision at a sender's first SETUP: only [Access.UNLOCKED] lets it in. */
+    fun admitsSender(): Boolean = access.admitsSender
 }

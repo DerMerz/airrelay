@@ -31,4 +31,41 @@
 
     <string name="licenses">Lizenzen</string>
     <string name="licenses_intro">Diese App ist freie Software. Du darfst sie unter den Bedingungen der GNU General Public License, Version 3, weitergeben und verändern. Sie wird ohne jede Gewährleistung bereitgestellt.\n\nQuelltext: %1$s\n\nEnthaltene Software:\n• android-airplay-server von jqssun (GPL-3.0), Grundlage dieser App\n• UxPlay (GPL-3.0), mit Teilen aus RPiPlay und ShairPlay (LGPL-2.1 oder neuer) sowie playfair (GPL)\n• libplist (LGPL-2.1 oder neuer)\n• llhttp (MIT)\n• OpenSSL (Apache-2.0)\n• FFmpeg, nur der ALAC-Decoder (LGPL-2.1 oder neuer)\n• Oboe (Apache-2.0)\n\niPhone und iPad sind Marken von Apple Inc. Fire TV ist eine Marke von Amazon.com, Inc. oder verbundenen Unternehmen. Diese App steht in keiner Verbindung zu Apple oder Amazon.\n\nEs folgt der vollständige Text der GNU General Public License, Version 3 (englisch).</string>
+
+    <string name="offer_headline_trial_days">%1$d Tage gratis testen</string>
+    <string name="offer_headline_trial">Gratis testen</string>
+    <string name="offer_headline">Bildschirmspiegelung freischalten</string>
+    <string name="offer_renewal">Zum Spiegeln brauchst du ein Abo. Verlängert sich automatisch, jederzeit im Amazon-Konto kündbar.</string>
+    <string name="term_yearly">Jährlich</string>
+    <string name="term_monthly">Monatlich</string>
+    <string name="price_trial_days_yearly">%1$d Tage gratis, dann %2$s/Jahr</string>
+    <string name="price_trial_days_monthly">%1$d Tage gratis, dann %2$s/Monat</string>
+    <string name="price_trial_yearly">Gratis testen, dann %1$s/Jahr</string>
+    <string name="price_trial_monthly">Gratis testen, dann %1$s/Monat</string>
+    <string name="price_yearly">%1$s/Jahr</string>
+    <string name="price_monthly">%1$s/Monat</string>
+    <string name="price_unknown">Preis laut Amazon</string>
+    <string name="yearly_compare_percent">%1$s im Monat, %2$d&#160;%% günstiger</string>
+    <string name="yearly_compare">%1$s im Monat</string>
+    <string name="restore">Kauf wiederherstellen</string>
+    <string name="attempt_refused">Ein iPhone oder iPad wollte gerade auf diesen Fernseher spiegeln. Dafür brauchst du ein aktives Abo.</string>
+    <string name="checking_headline">Abo wird bei Amazon geprüft …</string>
+    <string name="checking_body">Das dauert einen Moment.</string>
+    <string name="unreachable_headline">Amazon ist nicht erreichbar</string>
+    <string name="unreachable_body">Dein Abo lässt sich gerade nicht prüfen. Prüfe die Internetverbindung dieses Fire TV und versuche es erneut.</string>
+    <string name="overdue_headline">Dein Abo muss bestätigt werden</string>
+    <string name="overdue_body">Es konnte seit mehr als 3 Tagen nicht bei Amazon bestätigt werden. Verbinde diesen Fire TV mit dem Internet, dann geht das Spiegeln sofort wieder.</string>
+    <string name="msg_working">Einen Moment …</string>
+    <string name="msg_purchase_cancelled">Der Kauf wurde abgebrochen. Es wurde nichts berechnet.</string>
+    <string name="msg_product_not_found">Dieses Abo ist bei Amazon gerade nicht verfügbar. Versuche es später noch einmal.</string>
+    <string name="msg_already_subscribed">Du hast dieses Abo bereits. Es wird wiederhergestellt …</string>
+    <string name="msg_amazon_unreachable">Amazon ist gerade nicht erreichbar. Prüfe die Internetverbindung und versuche es erneut.</string>
+    <string name="msg_pending">Der Kauf wartet auf Freigabe. Sobald er freigegeben ist, kannst du spiegeln.</string>
+    <string name="msg_nothing_to_restore">Für dieses Amazon-Konto wurde kein aktives Abo gefunden.</string>
+    <string name="restored">Abo wiederhergestellt. Du kannst jetzt spiegeln.</string>
+    <string name="subscription_info">Abo: Du verwaltest und kündigst es in deinem Amazon-Konto, auf der Amazon-Website unter Mein Konto > Meine Apps > Meine Abonnements oder in der Amazon Appstore-App unter Meine Apps > Abonnements. Kündigst du, läuft das Abo bis zum Ende des bezahlten Zeitraums weiter.</string>
+
+    <string name="alert_channel">Spiegeln</string>
+    <string name="alert_mirroring">Ein iPhone oder iPad spiegelt. Zum Anzeigen öffnen.</string>
+    <string name="alert_refused">Ein iPhone oder iPad möchte spiegeln. Dafür brauchst du ein Abo.</string>
 </resources>
