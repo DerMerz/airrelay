@@ -57,6 +57,12 @@ APK mit dem Upload-Zertifikat signiert ist, dass keine App-Tester-Datei darin li
 `AppstoreAuthenticationKey.pem` darin liegt (fehlt sie, bricht es ab; nur für Testbuilds
 übergehbar mit `AIRRELAY_ALLOW_MISSING_PEM=1`).
 
+Letzter Store-Build (07.10.2026, Version 0.1.0, versionCode 1): `receiver-release.apk`,
+5.532.575 Byte (5,53 MB), SHA-256 `39972613c41fa7feaf47b9167880bf25592d87a9b8533620e1b276e29bd42ab4`,
+signiert mit dem Upload-Zertifikat (`apksigner`: v2, ein Signierer, RSA 4096), ABIs `arm64-v8a`
+und `armeabi-v7a`, minSdk 24, targetSdk 36, `assets/AppstoreAuthenticationKey.pem` darin,
+keine App-Tester-Datei. Auf dem Stick Lite installiert und gestartet (Dienst läuft auf Port 7000).
+
 Upload-Schlüssel (RSA 4096, 30 Jahre, Alias `airrelay`, Zertifikat SHA-256
 `9b305bbd…e449c8`):
 - Keystore: `~/Keys/airrelay/airrelay-upload.jks`, Kopie in iCloud Drive unter
@@ -193,21 +199,22 @@ adb shell am start -n de.merzkevin.airrelay/.MainActivity --es debug_locale en  
 ```
 Die Debug-Zuspielung fragt vorher dieselbe Freischaltung wie ein iPhone-SETUP.
 
-### Was vor der ersten Einreichung noch fehlt (Amazon-Konto)
+### Amazon-Konto, Stand 07.10.2026
 
-1. In der Konsole unter der App "AirRelay" ein Abo anlegen: Eltern-SKU
-   `de.merzkevin.airrelay.pro`, Laufzeiten `de.merzkevin.airrelay.pro.monthly` (monatlich,
-   2,49 €) und `de.merzkevin.airrelay.pro.yearly` (jährlich, 14,99 €), bei beiden
-   Probezeit "7 Tage". Die SKUs müssen Zeichen für Zeichen so heißen; weicht die Konsole
-   ab, ist der Code falsch, nicht die Konsole (Vertrag neu einfrieren, bevor irgendwer
-   gekauft hat).
-2. `AppstoreAuthenticationKey.pem` (Konsole, App, "Upload Your App File", "View public
-   key") nach `../store/amazon/AppstoreAuthenticationKey.pem` legen und
-   `tools/build_release.sh` starten: das Skript kopiert sie nach
-   `receiver/src/main/assets/`, baut, prüft, dass sie in der APK liegt. Die Datei ist ein
-   öffentlicher Schlüssel und gehört ins Repo (committen).
-3. Zum Testen vor der Freigabe: Live App Testing (braucht die PEM) oder App Tester (siehe
-   unten).
+1. Erledigt: in der Konsole unter der App "AirRelay" das Abo, Eltern-SKU
+   `de.merzkevin.airrelay.pro`, Laufzeiten `de.merzkevin.airrelay.pro.monthly` (2,49 €) und
+   `de.merzkevin.airrelay.pro.yearly` (14,99 €), jeweils 7 Tage Probezeit, Status Approved.
+   Die SKUs müssen Zeichen für Zeichen so heißen wie im Code (`Skus`).
+2. Erledigt: `AppstoreAuthenticationKey.pem` (öffentlicher Schlüssel, 451 Byte) liegt in
+   `../store/amazon/` und, vom Skript `tools/build_release.sh` übernommen, in
+   `receiver/src/main/assets/` (im Repo, die APK enthält sie: `unzip -l` zeigt
+   `assets/AppstoreAuthenticationKey.pem`).
+3. Offen: die Preise sehen und kaufen lassen. Eine per `adb install` geladene APK kennt
+   Amazon nicht: Der Appstore antwortet auf `getUserData`, `getProductData` und
+   `getPurchaseUpdates` mit `FAILED` (am 07.10.2026 auf dem Stick Lite gemessen), die App zeigt
+   dann "Amazon ist nicht erreichbar" mit "Erneut versuchen". Preise und Kauf gibt es nur über
+   Live App Testing (der Appstore kennt die App dann) oder, mit dem Debug-Build, über App Tester
+   (siehe unten).
 
 ### Kauf testen mit dem Amazon App Tester
 
@@ -339,19 +346,37 @@ Ab Android 11 gilt außerdem: Vordergrunddienste brauchen den Typ `connectedDevi
 | APK-Signaturschema v2 | erfüllt (`apksigner verify`: v2; v1 entfällt bei minSdk 24) |
 | minSdk 22 für alle Fire-TV-Geräte | NICHT erfüllt: minSdk 24 (Fire OS 6 und neuer). Fire OS 5 (Fire TV 1./2. Generation) bewusst ausgelassen |
 | IAP: Preis und Produkt aus der IAP-API, kein eigener Bestätigungsdialog vor dem Kauf | erfüllt (keine eigene Kaufbestätigung, nur Wiederherstellung und Abbruch zeigen eigene Meldungen) |
-| `AppstoreAuthenticationKey.pem` in `assets/` | offen, kommt aus der Konsole (siehe oben) |
+| `AppstoreAuthenticationKey.pem` in `assets/` | erfüllt (451 Byte, in der APK nachgewiesen) |
 
 ## Testliste für Kevin (iPhone, nur so prüfbar)
 
-1. Release installieren (vorher `adb uninstall de.merzkevin.airrelay`, Signatur wechselt).
-2. Ohne Abo: am iPhone spiegeln. Erwartung: iPhone meldet "konnte nicht verbinden" binnen
-   weniger Sekunden, kein halbes Bild, kein Hängen; der Fernseher zeigt den Abo-Kasten mit
-   "Ein iPhone oder iPad wollte gerade …". Einmal mit App im Vordergrund, einmal nach Home.
-3. Dasselbe mit Musik (AirPlay-Audio statt Spiegeln): ebenfalls abgewiesen.
-4. Nach Freischaltung (App Tester oder Live App Testing): spiegeln wie bisher, kein Hinweis.
-5. Abo aktiv, Stick vom Internet trennen (WLAN ohne Internet): spiegeln geht weiter; nach
-   mehr als 3 Tagen ohne Bestätigung kommt "Dein Abo muss bestätigt werden".
-6. Zweimal Zurück beim Spiegeln, Home beim Spiegeln: wie bisher.
+Stand 07.10.2026. Auf deinem Stick liegt die Store-Fassung 0.1.0 (mit dem Upload-Schlüssel
+signiert, die Fassung, die zu Amazon geht). Der Gerätename des Sticks ist wieder
+"Kevins 2. FireTVStick". Die Preise siehst du erst, wenn Amazon die App kennt (Punkt 4).
+
+1. App auf dem Stick öffnen. Erst steht oben ein Kasten "Abo wird bei Amazon geprüft …",
+   nach etwa 15 Sekunden "Amazon ist nicht erreichbar" mit dem Knopf "Erneut versuchen".
+   Darunter der Name deines Sticks und die drei Schritte, unten "Lizenzen". Das ist
+   richtig, solange die App nicht über Amazon installiert wurde. Es dürfen keine Preise und
+   kein Absturz zu sehen sein.
+2. Am iPhone Kontrollzentrum, "Bildschirmsynchronisierung", deinen Stick wählen. Das iPhone
+   meldet binnen weniger Sekunden, dass es nicht verbinden konnte (kein halbes Bild, kein
+   Hängen). Am Fernseher steht im Kasten "Ein iPhone oder iPad wollte gerade auf diesen
+   Fernseher spiegeln. Dafür brauchst du ein aktives Abo." Einmal mit der App im Vordergrund,
+   einmal nachdem du Home gedrückt hast (dann kommt die App von selbst nach vorn).
+3. Dasselbe mit Musik statt Spiegeln (AirPlay-Ton): ebenfalls abgewiesen, kein Ton aus dem
+   Fernseher.
+4. Über Live App Testing installieren (Beta Hub auf dem Stick). Der Kasten oben zeigt jetzt
+   "7 Tage gratis testen" und zwei Wahlknöpfe: "Jährlich, 7 Tage gratis, dann 14,99 €/Jahr"
+   (darunter "1,25 € im Monat, 49 % günstiger") und "Monatlich, 7 Tage gratis, dann
+   2,49 €/Monat", dazu "Kauf wiederherstellen". Kaufen (im Test kostet es nichts). Danach
+   verschwindet der Kasten, der Schirm zeigt "Bereit zum Spiegeln", und Spiegeln vom iPhone
+   klappt mit Bild und Ton wie gewohnt.
+5. Abo aktiv, den Stick vom Internet trennen (WLAN ohne Internet): Spiegeln geht weiter.
+   Nach mehr als 3 Tagen ohne Bestätigung steht dort "Dein Abo muss bestätigt werden".
+6. Beim Spiegeln zweimal Zurück: erst erscheint der Hinweis "Zum Beenden der Spiegelung noch
+   einmal Zurück drücken", dann ist die Spiegelung zu Ende und der Wartebildschirm da. Beim
+   Spiegeln Home drücken: der Ton läuft weiter, und beim Zurückkehren ist das Bild sofort wieder da.
 
 ## Bekannte Grenzen
 
