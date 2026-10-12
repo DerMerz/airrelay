@@ -10,8 +10,7 @@ plugins {
 // function names stay as they are.
 val appId = "de.merzkevin.airrelay"
 
-// Source code link shown on the licence screen (GPL-3.0 section 6). Placeholder until the
-// repository is public.
+// Source code link shown on the licence screen (GPL-3.0 section 6): the public repository.
 val sourceUrl = "https://github.com/DerMerz/airrelay"
 
 val localProps = Properties().apply {

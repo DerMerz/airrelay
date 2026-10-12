@@ -21,7 +21,7 @@ import de.merzkevin.airrelay.core.ReceiptInfo
  *
  * Verification happens on the device only (no receipt verification server): the SDK checks
  * the Appstore's signed answers with assets/AppstoreAuthenticationKey.pem, which comes from
- * the developer console (README "Amazon Appstore").
+ * the developer console (README "Building").
  *
  * Status values are mapped by name, so a value added in a later SDK becomes UNKNOWN
  * instead of breaking the build or unlocking by accident.

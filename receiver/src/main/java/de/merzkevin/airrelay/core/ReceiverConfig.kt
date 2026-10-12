@@ -8,7 +8,7 @@ object ReceiverConfig {
 
     /**
      * Frame rate announced to the sender (maxFPS / refreshRate). Chosen from a decode
-     * measurement on the Fire TV Stick Lite, see README ("Bildrate").
+     * measurement on the Fire TV Stick Lite, see README ("Measurements").
      */
     const val MAX_FPS = 60
 

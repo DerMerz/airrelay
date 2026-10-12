@@ -2,7 +2,7 @@ package de.merzkevin.airrelay.core
 
 /**
  * Wording of the offer. The button text is what the customer gets and pays, never a
- * command ("7 Tage gratis, dann 14,99 €/Jahr", not "Jetzt kaufen!"). A free trial is only
+ * command ("7 days free, then 14,99 €/year", not "Buy now!"). A free trial is only
  * mentioned while Amazon offers it to this customer (Product.getFreeTrialPeriod() is only
  * sent then), so nobody is promised a trial they already had.
  */
