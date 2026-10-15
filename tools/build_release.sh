@@ -6,9 +6,23 @@
 # Reads the keystore password from the macOS keychain (service airrelay-upload-keystore,
 # account kevin). Fails if the upload key is missing instead of falling back to the debug
 # key, if the APK is signed with anything else, if a test file for the App Tester ended up
-# inside, or if Amazon's public key (AppstoreAuthenticationKey.pem) is missing.
+# inside, if Amazon's public key (AppstoreAuthenticationKey.pem) is missing, if the playfair
+# helper program is not in the APK for both ABIs, or if the source is not a clean commit
+# tagged v<versionName> (the GPL source of a store version is exactly that tag).
 set -euo pipefail
 cd "$(dirname "$0")/.."
+
+VERSION_NAME="$(sed -n 's/^ *versionName = "\(.*\)"/\1/p' receiver/build.gradle.kts)"
+if [ "${AIRRELAY_ALLOW_UNTAGGED:-0}" != 1 ]; then
+    if ! git diff --quiet HEAD -- . ':!receiver/src/main/cpp/third_party'; then
+        echo "FAIL: uncommitted changes; a store build comes from a clean, tagged commit" >&2
+        exit 1
+    fi
+    if [ "$(git tag --points-at HEAD | grep -x "v$VERSION_NAME" || true)" != "v$VERSION_NAME" ]; then
+        echo "FAIL: HEAD is not tagged v$VERSION_NAME (git tag v$VERSION_NAME && git push origin v$VERSION_NAME)" >&2
+        exit 1
+    fi
+fi
 
 : "${JAVA_HOME:=/opt/homebrew/opt/openjdk@17/libexec/openjdk.jdk/Contents/Home}"
 : "${ANDROID_HOME:=/opt/homebrew/share/android-commandlinetools}"
@@ -58,6 +72,17 @@ if ! unzip -l "$APK" | grep -q "assets/AppstoreAuthenticationKey.pem"; then
         echo "FAIL: AppstoreAuthenticationKey.pem is not inside $APK" >&2
         exit 1
     fi
+fi
+
+for abi in armeabi-v7a arm64-v8a; do
+    if ! unzip -l "$APK" | grep -q "lib/$abi/libairrelay_playfair.so"; then
+        echo "FAIL: playfair helper missing for $abi (mirroring would fail at SETUP)" >&2
+        exit 1
+    fi
+done
+if "$ANDROID_HOME/build-tools/36.0.0/aapt2" dump xmltree --file AndroidManifest.xml "$APK" | grep -q 'extractNativeLibs.*=false'; then
+    echo "FAIL: extractNativeLibs is false, the helper could not be started" >&2
+    exit 1
 fi
 
 ls -l "$APK"
