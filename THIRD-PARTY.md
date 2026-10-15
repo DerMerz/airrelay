@@ -1,17 +1,21 @@
 # Bundled third-party software
 
-AirRelay as a whole is licensed under the GNU General Public License, version 3 (see `LICENSE`).
-This list names what is inside, under which license it is distributed, and where its source code is.
+AirRelay as a whole is licensed under the GNU General Public License, version 3 or later (see
+`LICENSE`). The code by Kevin Merz carries an additional permission to link with the Amazon Appstore
+SDK (see `LICENSE-EXCEPTION.md`, which also lists the files it covers). This list names what is
+inside, under which license it is distributed, where its source code is, and in which file of the
+APK it ends up (`libairrelay_native.so` is the app's library, `libairrelay_playfair.so` a separate
+program).
 The submodules are pinned to fixed commits (`git submodule status`), and the license texts are in the
 folder of each library under `receiver/src/main/cpp/third_party/`.
 
 | Component | Version | License | Source code | License text in the repository |
 |---|---|---|---|---|
-| android-airplay-server (jqssun): JNI callbacks, dns-sd replacement, audio engine, UxPlay patches | as of c8defdd (0.0.31) | GPL-3.0 | https://github.com/jqssun/android-airplay-server | `LICENSE` |
-| UxPlay: AirPlay protocol, pairing, mirror RTP | submodule `third_party/UxPlay`, commit 4621533 | GPL-3.0 | https://github.com/FDH2/UxPlay | `third_party/UxPlay/LICENSE` |
-| RPiPlay (parts in UxPlay) | as UxPlay | GPL-3.0 | https://github.com/FD-/RPiPlay | `third_party/UxPlay/LICENSE` |
-| ShairPlay (parts in UxPlay) | as UxPlay | LGPL-2.1 or later | https://github.com/juhovh/shairplay | headers of the source files in `third_party/UxPlay/lib` |
-| playfair (FairPlay part in UxPlay) | as UxPlay | GPL (text: GPL-3.0) | in UxPlay under `lib/playfair` | `third_party/UxPlay/lib/playfair/LICENSE.md` |
+| AirRelay's own code: Kotlin app, `crypto/` (replaces UxPlay `lib/crypto.c`), `playfair/playfair_pipe.*`, `playfair_bridge.c`, `playfair_helper.c` | this repository | GPL-3.0-or-later with the additional permission in `LICENSE-EXCEPTION.md` (`playfair_helper.c` without it) | this repository | `LICENSE`, `LICENSE-EXCEPTION.md` |
+| android-airplay-server (jqssun): JNI callbacks, dns-sd replacement, audio engine, UxPlay patches 0001 to 0006, in `libairrelay_native.so` | as of c8defdd (0.0.31) | GPL-3.0 (no additional permission from its authors) | https://github.com/jqssun/android-airplay-server | `LICENSE` |
+| UxPlay `lib/`: AirPlay protocol, pairing, mirror RTP (with parts of ShairPlay and RPiPlay), in `libairrelay_native.so` | submodule `third_party/UxPlay`, commit 4621533 | LGPL-2.1 or later (file headers; the repository as a whole is GPL-3.0) | https://github.com/FDH2/UxPlay, https://github.com/juhovh/shairplay, https://github.com/FD-/RPiPlay | headers of the source files in `third_party/UxPlay/lib`, `third_party/UxPlay/LICENSE` |
+| UxPlay `lib/crypto.c`, `lib/crypto.h` (GPL-3.0 or later) | as UxPlay | not used: not compiled since 0.1.1, replaced by AirRelay's own `crypto/` (written without reading it) | | |
+| playfair (FairPlay part in UxPlay), only in the separate program `libairrelay_playfair.so` | as UxPlay | GPL (text: GPL-3.0) | in UxPlay under `lib/playfair` | `third_party/UxPlay/lib/playfair/LICENSE.md` |
 | llhttp (HTTP parser in UxPlay) | as UxPlay | MIT | https://github.com/nodejs/llhttp | `third_party/UxPlay/lib/llhttp/LICENSE-MIT` |
 | libplist | submodule `third_party/libplist`, commit f41b1ea | LGPL-2.1 or later | https://github.com/libimobiledevice/libplist | `third_party/libplist/COPYING.LESSER` |
 | OpenSSL | 3.4.4, built via openssl-cmake | Apache-2.0 | https://github.com/openssl/openssl | fetched by openssl-cmake during the build |
@@ -25,7 +29,18 @@ Not included, although the upstream project uses them: ExoPlayer (Media3) and th
 AirRelay has no AndroidX dependency, the picture goes straight through `MediaCodec`.
 
 The patches to UxPlay are files in `receiver/src/main/cpp/patches/UxPlay/` and are applied during the
-build. The UxPlay source code itself stays unchanged in the submodule.
+build. The UxPlay source code itself stays unchanged in the submodule. The build copies UxPlay's `lib/`
+into the build directory without `crypto.c` and `crypto.h`, and a check after linking
+(`cmake/CheckLicenseSplit.cmake`) fails the build if playfair or UxPlay's `crypto.c` is found in
+`libairrelay_native.so`.
+
+## Known limits of the licence split
+
+- The jqssun parts in `libairrelay_native.so` are GPL-3.0 without an additional permission. The
+  permission in `LICENSE-EXCEPTION.md` can only cover Kevin Merz's code.
+- This is how the authors read the licences, not legal advice. Whether separate programs that talk
+  over a pipe count as separate works is, in the end, for courts to decide (FSF GPL FAQ,
+  "MereAggregation").
 
 ## Trademarks
 

@@ -3,7 +3,7 @@
 AirRelay is a lean AirPlay screen mirroring receiver for Fire TV (Fire OS, Android). It shows the
 screen of an iPhone, iPad or Mac on the TV, with sound, and nothing else: no video casting, no
 settings, no picture in picture, operated with the remote only. The source code is free software
-under the GNU General Public License, version 3.
+under the GNU General Public License, version 3 or later.
 
 AirPlay, iPhone, iPad and Mac are trademarks of Apple Inc. Fire TV and Amazon Appstore are trademarks
 of Amazon.com, Inc. or its affiliates. AirRelay is not affiliated with Apple or Amazon.
@@ -22,13 +22,17 @@ The debug build has switches that let you look at every state (see "Debug build"
 
 ## License
 
-GPL-3.0, the text is in [`LICENSE`](LICENSE). The app shows the license and the link to this source
-code on the waiting screen under "Licences". All bundled libraries with version, license and location
-are listed in [`THIRD-PARTY.md`](THIRD-PARTY.md). In short:
+GPL-3.0-or-later, the text is in [`LICENSE`](LICENSE). Kevin Merz's own code additionally may be
+linked with the Amazon Appstore SDK: the permission under GPL section 7 and the list of files it
+covers are in [`LICENSE-EXCEPTION.md`](LICENSE-EXCEPTION.md). The app shows the license and the link
+to this source code on the waiting screen under "Licences". All bundled libraries with version,
+license and location are listed in [`THIRD-PARTY.md`](THIRD-PARTY.md). In short:
 
 | Part | Source | License |
 |---|---|---|
-| Protocol, pairing, FairPlay, mirror RTP | [UxPlay](https://github.com/FDH2/UxPlay) (submodule) with parts of RPiPlay and ShairPlay as well as playfair | GPL-3.0, LGPL-2.1+, GPL-3.0 |
+| Protocol, pairing, mirror RTP | [UxPlay](https://github.com/FDH2/UxPlay) `lib/` (submodule) with parts of RPiPlay and ShairPlay | LGPL-2.1+ |
+| FairPlay key (playfair), a separate program `libairrelay_playfair.so`, not linked into the app | playfair in UxPlay `lib/playfair` | GPL-3.0 |
+| Cryptography helpers (`crypto/`, replaces UxPlay's GPL-only `lib/crypto.c`, which is not compiled) | this repository | GPL-3.0-or-later with the additional permission |
 | JNI callbacks, dns-sd replacement, audio engine, UxPlay patches | [jqssun/android-airplay-server](https://github.com/jqssun/android-airplay-server) (as of c8defdd, 0.0.31) | GPL-3.0 |
 | HTTP parser | llhttp (part of UxPlay) | MIT |
 | Property lists | [libplist](https://github.com/libimobiledevice/libplist) (submodule) | LGPL-2.1+ |
@@ -44,10 +48,19 @@ goes straight through `MediaCodec`.
 
 Note from UxPlay: the legal status of the FairPlay part (playfair) is unclear.
 
+Since 0.1.1 the two GPL-3.0-only parts of UxPlay are no longer inside the app's library:
+`crypto/airrelay_crypto.c` was written from scratch without reading `lib/crypto.c` (from the
+callers, the OpenSSL manual and measurements of the 0.1.0 binary, which it reproduces byte for
+byte, see "Tests"), and playfair runs as its own program: once per mirroring session the app starts
+`libairrelay_playfair.so` from its native library directory, writes 236 bytes to it and reads the
+16-byte key. The jqssun parts remain GPL-3.0 without an additional permission (THIRD-PARTY.md).
+
 ## Building
 
 Requirements: JDK 17, Android SDK with platform 36, build tools 36.0.0, NDK 27.0.12077973,
-CMake 3.22.1, Perl and Python 3 (for OpenSSL). Tested on macOS. The libraries come as Git submodules,
+CMake 3.22.1, Perl and Python 3 (for OpenSSL). For the unit tests also a C compiler (`cc`) and
+OpenSSL 3 for the build machine (Homebrew `openssl@3`, or `AIRRELAY_HOST_OPENSSL=<prefix>`, or
+pkg-config). Tested on macOS. The libraries come as Git submodules,
 `--depth 1` is enough.
 
 ```
@@ -71,9 +84,17 @@ password from the macOS keychain; adapt it for other environments.
 `packageDebug` and `packageRelease` depend on the unit tests. If a test is red, the compatibility
 contract included, no APK is produced.
 
-Tests: `./gradlew :receiver:testDebugUnitTest` (115 JVM tests). Counter-check in which every
-safeguard is removed once and the tests must turn red:
-`python3 tools/mutation_check.py` (72 safeguards).
+Tests: `./gradlew :receiver:testDebugUnitTest` (JVM_TEST_COUNT JVM tests). They include
+`NativeHostTest`, which builds the native code for the build machine (`src/test/native/build_host.sh`)
+and checks the crypto rewrite against 144 values measured from the 0.1.0 binary
+(`src/test/resources/native/crypto-vectors-0.1.0.txt`; 141 equal, 3 intended differences where the
+old code ended the process or skipped keystream after a reset), the playfair helper against 12 keys
+of the 0.1.0 playfair (`playfair-vectors-0.1.0.txt`), and the process call: success, crash,
+timeout, an answer without exit, short and long output, non-zero exit, missing helper. The frozen
+files were measured with `tools/measure_0.1.0_native.sh` and checked against an independent
+implementation with `python3 -I tools/verify_vectors_independent.py`. Counter-check in which every
+safeguard is removed once and the tests must turn red: `python3 tools/mutation_check.py`
+(MUTATION_COUNT safeguards).
 
 The file `receiver/src/main/assets/AppstoreAuthenticationKey.pem` is the app's public key from the
 Amazon developer console (`BEGIN PUBLIC KEY`). The Appstore SDK uses it to check the signed
@@ -83,6 +104,9 @@ responses. Your own store listing needs your own key.
 
 ```
 receiver/src/main/cpp/            native library libairrelay_native.so
+  crypto/                         AirRelay's own crypto helpers (replace UxPlay lib/crypto.c)
+  playfair/                       playfair helper program and the process call to it
+  cmake/CheckLicenseSplit.cmake   build fails if playfair or lib/crypto.c end up in the library
   native_bridge.cpp               JNI, fixed configuration
   android_raop_callbacks.c        8 callbacks into Kotlin, the rest answered natively
   android_dnssd_shim.c            TXT records for NsdManager (jqssun)
@@ -95,6 +119,7 @@ receiver/src/main/java/de/merzkevin/airrelay/
   video/VideoRenderer.kt          MediaCodec straight to the SurfaceView
   MainActivity.kt                 the one screen
 receiver/contract/compat-contract.txt   frozen compatibility contract
+receiver/src/test/native/         host builds of the native code for NativeHostTest
 tools/                            measuring script, counter-check of the tests, store build
 ```
 
