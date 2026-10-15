@@ -1,3 +1,8 @@
+/*
+ * AirRelay, Copyright (C) 2026 Kevin Merz
+ * SPDX-License-Identifier: GPL-3.0-or-later WITH LicenseRef-AirRelay-Amazon-Appstore-SDK-exception
+ * GNU GPL version 3 or later, with the additional permission in LICENSE-EXCEPTION.md.
+ */
 package de.merzkevin.airrelay.core
 
 import org.junit.Assert.assertFalse
@@ -80,6 +85,88 @@ class GuardsExistTest {
         // the comparison alone would not notice an admission that lets everybody in
         assertTrue("onClientRequest no longer asks the gate", svc.contains("val admitted = LicenseGate.admitsSender()"))
         assertTrue(svc.contains("return admitted"))
+    }
+
+    @Test fun gplOnlyPartsStayOutOfTheLibrary() {
+        val cmake = File(moduleDir, "src/main/cpp/CMakeLists.txt").readText()
+        assertFalse("UxPlay lib/crypto.c is compiled again", Regex("UXPLAY_\\w+\\}/crypto\\.c").containsMatchIn(cmake))
+        assertTrue("crypto.c/crypto.h are no longer left out of the staged lib/",
+            cmake.contains("list(REMOVE_ITEM UXPLAY_LIB_FILES crypto.c crypto.h)"))
+        assertTrue("own crypto is not compiled", cmake.contains("crypto/airrelay_crypto.c"))
+        val link = cmake.substringAfter("target_link_libraries(airrelay_native").substringBefore(")")
+        assertFalse("playfair is linked into the library", link.contains("playfair"))
+        val lib = cmake.substringAfter("add_library(airrelay_native SHARED").substringBefore(")")
+        assertFalse("playfair sources in the library", lib.contains("playfair/playfair.c") || lib.contains("omg_hax"))
+        assertTrue("the playfair helper is no longer its own program",
+            Regex("add_executable\\(airrelay_playfair[^)]*omg_hax\\.c", RegexOption.DOT_MATCHES_ALL).containsMatchIn(cmake))
+        assertTrue("the include path holds UxPlay's crypto.h again", !Regex("\\$\\{UXPLAY_LIB\\}\\s*\\n").containsMatchIn(
+            cmake.substringAfter("target_include_directories(airrelay_native SYSTEM PRIVATE").substringBefore(")")))
+        assertTrue("post-link check is gone", cmake.contains("POST_BUILD") && cmake.contains("CheckLicenseSplit.cmake"))
+        val check = File(moduleDir, "src/main/cpp/cmake/CheckLicenseSplit.cmake").readText()
+        for (s in listOf("playfair_decrypt|garble", "Crypto error at", "^airrelay_playfair_decrypt$", "FATAL_ERROR")) {
+            assertTrue("CheckLicenseSplit.cmake lost \"$s\"", check.contains(s))
+        }
+        val patch = File(moduleDir, "src/main/cpp/patches/UxPlay/0008-playfair-as-separate-program.patch")
+        assertTrue("patch 0008 is missing", patch.exists())
+        val p = patch.readText()
+        assertTrue("0008 no longer routes the key through the helper", p.contains("+    return airrelay_fairplay_decrypt(fp->keymsg, input, output) == 0 ? 0 : -1;"))
+        assertTrue("0008 no longer refuses the stream on failure", p.contains("500, \"Internal Server Error\""))
+        // the crypto rewrite differs from 0.1.0 after aes_ctr_reset; harmless only while nobody calls it
+        val uxplay = File(moduleDir, "src/main/cpp/third_party/UxPlay/lib")
+        val callers = uxplay.listFiles()!!.filter { (it.extension == "c" || it.extension == "h") && !it.name.startsWith("crypto.") }
+            .filter { it.readText().contains("aes_ctr_reset(") }.map { it.name }
+        assertTrue("UxPlay now calls aes_ctr_reset (see NativeHostTest intendedDifferences): $callers", callers.isEmpty())
+    }
+
+    @Test fun playfairHelperIsPackagedExtractedAndFound() {
+        val gradle = File(moduleDir, "build.gradle.kts").readText()
+        assertTrue("native files are no longer extracted: the helper cannot be started",
+            gradle.contains("jniLibs.useLegacyPackaging = true"))
+        val cmake = File(moduleDir, "src/main/cpp/CMakeLists.txt").readText()
+        val config = File(moduleDir, "src/main/java/de/merzkevin/airrelay/core/ReceiverConfig.kt").readText()
+        val name = Regex("PLAYFAIR_HELPER = \"([^\"]+)\"").find(config)?.groupValues?.get(1)
+        assertTrue("PLAYFAIR_HELPER is gone", name != null)
+        assertTrue("CMake output name and PLAYFAIR_HELPER differ", cmake.contains("OUTPUT_NAME \"$name\""))
+        assertTrue("helper must be named lib*.so to be packaged", name!!.startsWith("lib") && name.endsWith(".so"))
+        val svc = File(moduleDir, "src/main/java/de/merzkevin/airrelay/ReceiverService.kt").readText()
+        assertTrue("service no longer hands the helper path to the native side",
+            svc.contains("File(applicationInfo.nativeLibraryDir, ReceiverConfig.PLAYFAIR_HELPER)") &&
+                svc.contains("NativeBridge.nativeSetPlayfairHelper(helper.path)"))
+    }
+
+    @Test fun nativeHostTestsExistRunAndCannotSkip() {
+        val f = File(moduleDir, "src/test/java/de/merzkevin/airrelay/nativecode/NativeHostTest.kt")
+        assertTrue("NativeHostTest.kt is gone", f.exists())
+        val t = f.readText()
+        assertFalse("NativeHostTest must not be ignored", Regex("@[\\w.]*Ignore\\b").containsMatchIn(t))
+        for (forbidden in listOf("Assume.", "assumeTrue", "assumeFalse", "assumeNotNull")) {
+            assertFalse("NativeHostTest must not skip ($forbidden)", t.contains(forbidden))
+        }
+        for (s in listOf("assertEquals(\"frozen vector file shrank or grew\", 144", "assertEquals(\"compared values\", 141",
+                "assertEquals(\"vector count\", 12", "processCallTimeoutKillsTheHelper", "processCallCrash",
+                "processCallShortOutput", "airplayIdentityOfTheContractDevicesIsUnchanged")) {
+            assertTrue("NativeHostTest lost \"$s\"", t.contains(s))
+        }
+        for (n in listOf("crypto-vectors-0.1.0.txt", "playfair-vectors-0.1.0.txt", "rfc8032-test1.seed.hex")) {
+            assertTrue("fixture $n is missing", File(moduleDir, "src/test/resources/native/$n").exists())
+        }
+        val gradle = File(moduleDir, "build.gradle.kts").readText()
+        assertTrue("unit tests no longer build the native host tests",
+            Regex("withType<Test>\\(\\)\\.configureEach \\{\\s*dependsOn\\(buildHostNativeTests\\)").containsMatchIn(gradle))
+    }
+
+    @Test fun ownFilesCarryTheAdditionalPermission() {
+        val root = moduleDir.parentFile
+        val exception = File(root, "LICENSE-EXCEPTION.md")
+        assertTrue("LICENSE-EXCEPTION.md is missing", exception.exists())
+        val e = exception.readText()
+        assertTrue(e.contains("Additional permission under GNU GPL version 3 section 7") && e.contains("Amazon Appstore SDK"))
+        val own = File(moduleDir, "src").walkTopDown().filter { it.isFile && it.extension == "kt" && "third_party" !in it.path }.toList() +
+            listOf("crypto/airrelay_crypto.c", "crypto/crypto.h", "playfair/playfair_pipe.c", "playfair/playfair_pipe.h",
+                "playfair/playfair_bridge.c").map { File(moduleDir, "src/main/cpp/$it") }
+        val missing = own.filterNot { it.readText().contains("LICENSE-EXCEPTION.md") }.map { it.name }
+        assertTrue("files without the licence header: $missing", missing.isEmpty())
+        assertTrue("own files found", own.size > 30)
     }
 
     @Test fun packagingWaitsForTheUnitTests() {

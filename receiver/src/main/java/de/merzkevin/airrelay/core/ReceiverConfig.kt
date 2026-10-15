@@ -1,3 +1,8 @@
+/*
+ * AirRelay, Copyright (C) 2026 Kevin Merz
+ * SPDX-License-Identifier: GPL-3.0-or-later WITH LicenseRef-AirRelay-Amazon-Appstore-SDK-exception
+ * GNU GPL version 3 or later, with the additional permission in LICENSE-EXCEPTION.md.
+ */
 package de.merzkevin.airrelay.core
 
 /** Fixed receiver settings. There is no settings screen; these are the product decisions. */
@@ -24,6 +29,13 @@ object ReceiverConfig {
 
     /** How long "press Back again to stop" stays armed. */
     const val STOP_HINT_MS = 3000L
+
+    /**
+     * File name of the playfair helper program in nativeLibraryDir: an executable named like
+     * a library so that it is packaged and extracted (CMakeLists.txt, OUTPUT_NAME). playfair
+     * is GPL-3.0 only and runs there as a separate process, not inside the app.
+     */
+    const val PLAYFAIR_HELPER = "libairrelay_playfair.so"
 }
 
 /**

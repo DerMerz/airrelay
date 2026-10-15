@@ -75,6 +75,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            // Side-by-side install next to a store install (different signature, same package
+            // name otherwise): ./gradlew assembleDebug -PairrelayIdSuffix=.dev
+            (findProperty("airrelayIdSuffix") as String?)?.let { applicationIdSuffix = it }
+        }
         release {
             isMinifyEnabled = true
             isShrinkResources = true
@@ -117,6 +122,9 @@ android {
 
     packaging {
         resources.excludes += listOf("META-INF/*.version", "kotlin/**", "DebugProbesKt.bin")
+        // Native files are extracted to nativeLibraryDir on install: the playfair helper is an
+        // executable there (libairrelay_playfair.so) and can only be started from a real file.
+        jniLibs.useLegacyPackaging = true
     }
 }
 
@@ -150,6 +158,24 @@ tasks.configureEach {
 // path around it; GuardsExistTest fails if this block disappears.
 listOf("Debug", "Release").forEach { variant ->
     tasks.matching { it.name == "package${variant}" }.configureEach { dependsOn("test${variant}UnitTest") }
+}
+
+// Native host tests (NativeHostTest): the crypto rewrite and the playfair helper with its
+// process call, compiled for this machine (cc, OpenSSL 3) from the same sources as the app.
+// Part of every unit test run, so of the packaging blocker above as well.
+val hostNativeDir = layout.buildDirectory.dir("host-native")
+val buildHostNativeTests = tasks.register<Exec>("buildHostNativeTests") {
+    inputs.dir("src/test/native")
+    inputs.dir("src/main/cpp/crypto")
+    inputs.dir("src/main/cpp/playfair")
+    inputs.dir("src/main/cpp/third_party/UxPlay/lib/playfair")
+    outputs.dir(hostNativeDir)
+    commandLine("sh", file("src/test/native/build_host.sh").path, hostNativeDir.get().asFile.path)
+}
+tasks.withType<Test>().configureEach {
+    dependsOn(buildHostNativeTests)
+    inputs.dir(hostNativeDir)
+    systemProperty("airrelay.hostNative", hostNativeDir.get().asFile.path)
 }
 
 tasks.withType<Zip>().configureEach {

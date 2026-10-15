@@ -1,0 +1,3 @@
+# RFC 8032 section 7.1, TEST 1, SECRET KEY (public test vector, not a secret).
+# The tests wrap it into a PKCS#8 PEM file at run time (prefix 302e020100300506032b657004220420).
+9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60

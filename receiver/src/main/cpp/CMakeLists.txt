@@ -2,8 +2,15 @@ cmake_minimum_required(VERSION 3.22.1)
 project(airrelay_native C CXX)
 
 # One shared library, everything else static: OpenSSL, Oboe, libc++, FFmpeg (ALAC only),
-# libplist, llhttp, playfair. Unused code is dropped at link time (gc-sections), the
-# release build is stripped by AGP.
+# libplist, llhttp. Unused code is dropped at link time (gc-sections), the release build is
+# stripped by AGP.
+#
+# Licence split (LICENSE-EXCEPTION.md, THIRD-PARTY.md): two UxPlay parts are GPL-3.0 only
+# and are NOT linked into libairrelay_native.so:
+#   lib/crypto.c, lib/crypto.h   replaced by AirRelay's own crypto/airrelay_crypto.c
+#   lib/playfair/                built as its own program, libairrelay_playfair.so (an
+#                                executable), run per key through playfair/playfair_pipe.c
+# cmake/CheckLicenseSplit.cmake fails the build if either finds its way back in.
 
 set(CMAKE_C_STANDARD 17)
 set(CMAKE_CXX_STANDARD 17)
@@ -67,7 +74,7 @@ target_include_directories(plist
 )
 target_compile_definitions(plist PRIVATE _GNU_SOURCE HAVE_STRNDUP PACKAGE_VERSION="2.6.0")
 
-# ---------- llhttp and playfair (embedded in UxPlay) ----------
+# ---------- llhttp (embedded in UxPlay, MIT) ----------
 add_library(llhttp STATIC
     ${UXPLAY_LIB}/llhttp/api.c
     ${UXPLAY_LIB}/llhttp/http.c
@@ -75,56 +82,84 @@ add_library(llhttp STATIC
 )
 target_include_directories(llhttp PUBLIC ${UXPLAY_LIB}/llhttp)
 
-add_library(playfair STATIC
+# ---------- playfair helper: a separate program, never linked into the library ----------
+# Named lib*.so so that the packager puts it into the APK's lib/<abi>/ and Android extracts
+# it into nativeLibraryDir, the one app directory it may be executed from. stdin: 236 bytes,
+# stdout: 16 bytes (playfair/playfair_pipe.h).
+add_executable(airrelay_playfair
+    playfair/playfair_helper.c
     ${UXPLAY_LIB}/playfair/hand_garble.c
     ${UXPLAY_LIB}/playfair/modified_md5.c
     ${UXPLAY_LIB}/playfair/omg_hax.c
     ${UXPLAY_LIB}/playfair/playfair.c
     ${UXPLAY_LIB}/playfair/sap_hash.c
 )
-target_include_directories(playfair PUBLIC ${UXPLAY_LIB}/playfair)
+target_include_directories(airrelay_playfair SYSTEM PRIVATE ${UXPLAY_LIB}/playfair)
+set_source_files_properties(playfair/playfair_helper.c PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
+set_target_properties(airrelay_playfair PROPERTIES
+    PREFIX "" SUFFIX "" OUTPUT_NAME "libairrelay_playfair.so"
+    RUNTIME_OUTPUT_DIRECTORY "${CMAKE_LIBRARY_OUTPUT_DIRECTORY}")
+target_link_options(airrelay_playfair PRIVATE "-Wl,--build-id=none" "-Wl,--gc-sections")
+target_link_libraries(airrelay_playfair m)
 
 # ---------- UxPlay core ----------
+# lib/ is copied into the build tree without crypto.c and crypto.h, so that the quoted
+# #include "crypto.h" in the UxPlay sources (searched first in their own directory) can only
+# find crypto/crypto.h. configure_file re-copies a file when it changes (patches).
+set(UXPLAY_STAGE ${CMAKE_CURRENT_BINARY_DIR}/uxplay-lib)
+file(GLOB UXPLAY_LIB_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR}/${UXPLAY_LIB}
+    ${CMAKE_CURRENT_SOURCE_DIR}/${UXPLAY_LIB}/*.c ${CMAKE_CURRENT_SOURCE_DIR}/${UXPLAY_LIB}/*.h)
+list(REMOVE_ITEM UXPLAY_LIB_FILES crypto.c crypto.h)
+foreach(f IN LISTS UXPLAY_LIB_FILES)
+    configure_file(${UXPLAY_LIB}/${f} ${UXPLAY_STAGE}/${f} COPYONLY)
+endforeach()
+# http_request.c includes "llhttp/llhttp.h" relative to its own directory; the staged copy
+# needs the header next to it as well (the llhttp sources stay in ${UXPLAY_LIB}/llhttp).
+configure_file(${UXPLAY_LIB}/llhttp/llhttp.h ${UXPLAY_STAGE}/llhttp/llhttp.h COPYONLY)
+
 # airplay_video.c is only reached with HLS enabled, which this receiver never does, but
 # raop.c links against it.
 set(UXPLAY_SOURCES
-    ${UXPLAY_LIB}/airplay_video.c
-    ${UXPLAY_LIB}/byteutils.c
-    ${UXPLAY_LIB}/compat.c
-    ${UXPLAY_LIB}/crypto.c
-    ${UXPLAY_LIB}/dnssd.c
-    ${UXPLAY_LIB}/fairplay_playfair.c
-    ${UXPLAY_LIB}/http_request.c
-    ${UXPLAY_LIB}/http_response.c
-    ${UXPLAY_LIB}/httpd.c
-    ${UXPLAY_LIB}/logger.c
-    ${UXPLAY_LIB}/mirror_buffer.c
-    ${UXPLAY_LIB}/netutils.c
-    ${UXPLAY_LIB}/pairing.c
-    ${UXPLAY_LIB}/raop.c
-    ${UXPLAY_LIB}/raop_buffer.c
-    ${UXPLAY_LIB}/raop_ntp.c
-    ${UXPLAY_LIB}/raop_rtp.c
-    ${UXPLAY_LIB}/raop_rtp_mirror.c
-    ${UXPLAY_LIB}/srp.c
-    ${UXPLAY_LIB}/utils.c
+    ${UXPLAY_STAGE}/airplay_video.c
+    ${UXPLAY_STAGE}/byteutils.c
+    ${UXPLAY_STAGE}/compat.c
+    ${UXPLAY_STAGE}/dnssd.c
+    ${UXPLAY_STAGE}/fairplay_playfair.c
+    ${UXPLAY_STAGE}/http_request.c
+    ${UXPLAY_STAGE}/http_response.c
+    ${UXPLAY_STAGE}/httpd.c
+    ${UXPLAY_STAGE}/logger.c
+    ${UXPLAY_STAGE}/mirror_buffer.c
+    ${UXPLAY_STAGE}/netutils.c
+    ${UXPLAY_STAGE}/pairing.c
+    ${UXPLAY_STAGE}/raop.c
+    ${UXPLAY_STAGE}/raop_buffer.c
+    ${UXPLAY_STAGE}/raop_ntp.c
+    ${UXPLAY_STAGE}/raop_rtp.c
+    ${UXPLAY_STAGE}/raop_rtp_mirror.c
+    ${UXPLAY_STAGE}/srp.c
+    ${UXPLAY_STAGE}/utils.c
 )
 
 add_library(airrelay_native SHARED
     ${UXPLAY_SOURCES}
+    crypto/airrelay_crypto.c
+    playfair/playfair_pipe.c
+    playfair/playfair_bridge.c
     android_dnssd_shim.c
     android_raop_callbacks.c
     native_bridge.cpp
     audio_engine.cpp
 )
-add_dependencies(airrelay_native ffmpeg_ep)
+add_dependencies(airrelay_native ffmpeg_ep airrelay_playfair)
 
-target_include_directories(airrelay_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-# third-party headers as SYSTEM, so the strict warnings below apply to our code only
+target_include_directories(airrelay_native PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}
+    ${CMAKE_CURRENT_SOURCE_DIR}/crypto ${CMAKE_CURRENT_SOURCE_DIR}/playfair)
+# third-party headers as SYSTEM, so the strict warnings below apply to our code only.
+# ${UXPLAY_LIB} itself is not on the path: it still holds the unused crypto.h.
 target_include_directories(airrelay_native SYSTEM PRIVATE
-    ${UXPLAY_LIB}
+    ${UXPLAY_STAGE}
     ${UXPLAY_LIB}/llhttp
-    ${UXPLAY_LIB}/playfair
     third_party/oboe/include
 )
 
@@ -132,6 +167,7 @@ target_compile_options(airrelay_native PRIVATE -fvisibility=hidden $<$<COMPILE_L
 
 # own sources: all warnings are errors (third-party code keeps its own warning level)
 set_source_files_properties(native_bridge.cpp android_raop_callbacks.c android_dnssd_shim.c audio_engine.cpp
+    crypto/airrelay_crypto.c playfair/playfair_pipe.c playfair/playfair_bridge.c
     PROPERTIES COMPILE_OPTIONS "-Wall;-Wextra;-Werror")
 
 target_compile_definitions(airrelay_native PRIVATE
@@ -150,7 +186,6 @@ target_link_options(airrelay_native PRIVATE
 
 target_link_libraries(airrelay_native
     llhttp
-    playfair
     crypto
     plist
     oboe
@@ -161,3 +196,9 @@ target_link_libraries(airrelay_native
     log
     android
 )
+
+# Blocker: the library must not contain playfair or UxPlay's crypto.c, and the helper must.
+add_custom_command(TARGET airrelay_native POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -DLIB=$<TARGET_FILE:airrelay_native> -DHELPER=$<TARGET_FILE:airrelay_playfair>
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/CheckLicenseSplit.cmake
+    VERBATIM)

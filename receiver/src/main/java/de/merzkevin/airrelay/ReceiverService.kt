@@ -1,3 +1,8 @@
+/*
+ * AirRelay, Copyright (C) 2026 Kevin Merz
+ * SPDX-License-Identifier: GPL-3.0-or-later WITH LicenseRef-AirRelay-Amazon-Appstore-SDK-exception
+ * GNU GPL version 3 or later, with the additional permission in LICENSE-EXCEPTION.md.
+ */
 package de.merzkevin.airrelay
 
 import android.app.Notification
@@ -46,6 +51,7 @@ import de.merzkevin.airrelay.core.receiverName
 import de.merzkevin.airrelay.core.startOutcome
 import de.merzkevin.airrelay.video.VideoRenderer
 import java.net.NetworkInterface
+import java.io.File
 
 /**
  * Foreground service that owns the receiver: native server, dns-sd announcement, video
@@ -167,6 +173,11 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
             am.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)?.toIntOrNull() ?: 0,
             am.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)?.toIntOrNull() ?: 0,
         )
+        val helper = File(applicationInfo.nativeLibraryDir, ReceiverConfig.PLAYFAIR_HELPER)
+        if (!helper.canExecute() || !NativeBridge.nativeSetPlayfairHelper(helper.path)) {
+            // the receiver still starts; a sender then gets an error at SETUP (patch 0008)
+            Log.e(TAG, "playfair helper not usable: $helper")
+        }
         val size = advertisedSize(displaySize(), null)
         val deviceId = deviceIdFor(Settings.Secure.getString(contentResolver, Settings.Secure.ANDROID_ID))
         handle = NativeBridge.nativeInit(this, deviceId, name, size.width, size.height,
