@@ -11,3 +11,5 @@ local.properties
 INTERN-README*
 measure-*.log
 measure-*.csv
+# Python bytecode of the tools/ scripts
+__pycache__/
