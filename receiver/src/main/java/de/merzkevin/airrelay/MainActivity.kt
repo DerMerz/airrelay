@@ -8,6 +8,7 @@ package de.merzkevin.airrelay
 import android.app.Activity
 import android.app.NotificationManager
 import android.content.ComponentName
+import android.content.res.Configuration
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
@@ -30,6 +31,7 @@ import android.widget.Toast
 import de.merzkevin.airrelay.billing.Subscriptions
 import de.merzkevin.airrelay.core.Access
 import de.merzkevin.airrelay.core.BackAction
+import de.merzkevin.airrelay.core.FontScale
 import de.merzkevin.airrelay.core.LicenseGate
 import de.merzkevin.airrelay.core.OfferMessage
 import de.merzkevin.airrelay.core.ReceiverConfig
@@ -114,7 +116,7 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
             DebugHooks.onIntent(this@MainActivity, intent, s)
         }
 
-        override fun onServiceDisconnected(name: ComponentName) {
+        override fun onServiceDisconnected(name: ComponentName?) {
             service = null
         }
     }
@@ -177,7 +179,14 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
 
     override fun attachBaseContext(newBase: Context) {
         // debug builds: app language from adb (DebugHooks); release: unchanged
-        super.attachBaseContext(DebugHooks.wrapLocale(newBase))
+        val wrapped = DebugHooks.wrapLocale(newBase)
+        // the system font scale counts only up to FontScale.MAX: above it the screens do not fit
+        val config = wrapped.resources.configuration
+        val scale = FontScale.capped(config.fontScale)
+        super.attachBaseContext(
+            if (scale == config.fontScale) wrapped
+            else wrapped.createConfigurationContext(Configuration(config).apply { fontScale = scale }),
+        )
     }
 
     override fun onNewIntent(intent: Intent) {

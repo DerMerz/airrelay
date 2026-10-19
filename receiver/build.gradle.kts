@@ -52,8 +52,8 @@ android {
         // Fire OS 6 (Android 7.1) and newer; the measured target is Fire OS 7 (API 28)
         minSdk = 24
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.1.1"
+        versionCode = 3
+        versionName = "0.1.2"
         buildConfigField("String", "SOURCE_URL", "\"$sourceUrl\"")
 
         ndk {
@@ -113,6 +113,9 @@ android {
 
     testOptions {
         unitTests.isReturnDefaultValues = false
+        // ScreenFitTest inflates the real layout and measures the real text (Robolectric,
+        // native graphics), so it needs the merged resources.
+        unitTests.isIncludeAndroidResources = true
     }
 
     dependenciesInfo {
@@ -176,6 +179,10 @@ tasks.withType<Test>().configureEach {
     dependsOn(buildHostNativeTests)
     inputs.dir(hostNativeDir)
     systemProperty("airrelay.hostNative", hostNativeDir.get().asFile.path)
+    // Robolectric (ScreenFitTest) starts the manifest receivers, among them the Amazon SDK's
+    // ResponseReceiver, whose old bytecode has no stack map frames and fails the verifier on JDK 17.
+    // Tests only; the app is not touched.
+    jvmArgs("-XX:+UnlockDiagnosticVMOptions", "-XX:-BytecodeVerificationRemote") // T31-JVM
 }
 
 tasks.withType<Zip>().configureEach {
@@ -188,4 +195,7 @@ dependencies {
     // transitive dependencies, no manifest of its own (entries are in AndroidManifest.xml).
     implementation("com.amazon.device:amazon-appstore-sdk:3.0.9")
     testImplementation("junit:junit:4.13.2")
+    // ScreenFitTest: the screens at the sizes and font scales of a Fire TV, text measured by
+    // the real Android text engine (GraphicsMode.NATIVE), not by a stand-in.
+    testImplementation("org.robolectric:robolectric:4.14.1")
 }

@@ -52,10 +52,11 @@
 
         <TextView
             android:id="@+id/offer_body"
-            android:layout_width="match_parent"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_marginTop="4dp"
             android:lineSpacingExtra="2dp"
+            android:maxWidth="620dp"
             android:textColor="@color/text_secondary"
             android:textSize="16sp"
             tools:text="@string/offer_renewal" />

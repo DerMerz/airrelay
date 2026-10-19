@@ -169,6 +169,35 @@ class GuardsExistTest {
         assertTrue("own files found", own.size > 30)
     }
 
+    @Test fun screenFitTestExistsCannotSkipAndKeepsItsMatrix() {
+        // T-31: a text cut off on a stick. Everything left would stay green if this were deleted.
+        val f = File(moduleDir, "src/test/java/de/merzkevin/airrelay/ui/ScreenFitTest.kt")
+        assertTrue("ScreenFitTest.kt is gone", f.exists())
+        val t = f.readText()
+        assertFalse("ScreenFitTest must not be ignored", Regex("@[\\w.]*Ignore\\b").containsMatchIn(t))
+        for (forbidden in listOf("Assume.", "assumeTrue", "assumeFalse", "assumeNotNull")) {
+            assertFalse("ScreenFitTest must not skip ($forbidden)", t.contains(forbidden))
+        }
+        for (s in listOf("noTextOnAnyScreenIsCutOff", "const val CASES = 2 * 2 * 5 * (", "listOf(0.85f, 1.0f, 1.15f, 1.3f, 2.0f)",
+                "GraphicsMode.Mode.NATIVE", "w960dp-h540dp-xhdpi", "w960dp-h540dp-tvdpi", "getEllipsisCount", "clipToPadding",
+                "OfferMessage.values()", "ServerStatus.values()", "assertEquals(\"the matrix has shrunk or grown")) {
+            assertTrue("ScreenFitTest lost \"$s\"", t.contains(s))
+        }
+        val gradle = File(moduleDir, "build.gradle.kts").readText()
+        assertTrue("Robolectric is no longer a test dependency", gradle.contains("testImplementation(\"org.robolectric:robolectric:"))
+        assertTrue("unit tests no longer see the resources", gradle.contains("isIncludeAndroidResources = true"))
+    }
+
+    @Test fun fontScaleCapAndOfferWidthAreStillInPlace() {
+        // the two measures that keep the subscription card inside the screen (T-31)
+        val main = File(moduleDir, "src/main/java/de/merzkevin/airrelay/MainActivity.kt").readText()
+        assertTrue("MainActivity no longer caps the system font scale", main.contains("FontScale.capped(config.fontScale)"))
+        val layout = File(moduleDir, "src/main/res/layout/activity_main.xml").readText()
+        val body = layout.substringAfter("android:id=\"@+id/offer_body\"").substringBefore("/>")
+        assertTrue("offer_body lost its maximum width", body.contains("android:maxWidth="))
+        assertTrue("FontScale.kt is gone", File(moduleDir, "src/main/java/de/merzkevin/airrelay/core/FontScale.kt").exists())
+    }
+
     @Test fun packagingWaitsForTheUnitTests() {
         val gradle = File(moduleDir, "build.gradle.kts").readText()
         assertTrue("build.gradle.kts no longer blocks packaging on the unit tests",
