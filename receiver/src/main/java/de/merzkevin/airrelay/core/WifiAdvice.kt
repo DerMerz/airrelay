@@ -22,7 +22,7 @@ object WifiThresholds {
     const val INVALID_RSSI = -127
 
     /** One stall can be chance (a microwave, a neighbour's download); two on the same
-     *  network since the receiver started are a pattern. */
+     *  network since the receiver started are a pattern (counted in [NetworkCatchUps]). */
     const val MANY_CATCH_UPS = 2
 
     /** The hint goes away by itself after this. */
@@ -74,6 +74,44 @@ fun wifiAdvice(rssi: RssiClass, band: BandClass, catchUps: CatchUpClass): WifiAd
     rssi == RssiClass.WEAK -> WifiAdvice.WEAK_SIGNAL
     band == BandClass.GHZ_24 && catchUps == CatchUpClass.MANY -> WifiAdvice.BUSY_24GHZ
     else -> WifiAdvice.NONE
+}
+
+/**
+ * One Wi-Fi network as far as the catch-up counter is concerned: the connection (Android
+ * hands out a new network handle on every connect, so another SSID or a reconnect is another
+ * key) and the band it runs on (a stick that moved from 2.4 to 5 GHz on the same SSID is on
+ * another network for the hint). Never stored.
+ */
+data class NetworkKey(val networkHandle: Long?, val band: BandClass)
+
+/**
+ * Catch-up phases on the network the stick is on now (T-31c, Prüfer 0.1.3 Befund 2). Every
+ * change of [NetworkKey] starts again at 0, also a change back to an earlier network. Memory
+ * only; a restart of the receiver starts at 0 as well. Server thread only.
+ */
+class NetworkCatchUps {
+    private var key: NetworkKey? = null
+    private var count = 0L
+
+    /** Phases counted on [on]; switches to it (and to 0) if the stick changed network. */
+    fun countOn(on: NetworkKey): Long {
+        if (on != key) {
+            key = on
+            count = 0
+        }
+        return count
+    }
+
+    /** One more phase on [on]. Returns the new count on that network. */
+    fun add(on: NetworkKey): Long {
+        countOn(on)
+        return ++count
+    }
+
+    fun reset() {
+        key = null
+        count = 0
+    }
 }
 
 /** Where the hint may appear. */

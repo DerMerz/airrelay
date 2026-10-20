@@ -72,6 +72,24 @@ class DecisionTablesTest {
     }
 
     @Test
+    fun catchUpCountMatchesTheTableForEveryCombination() {
+        val rows = table("catchup-table.txt")
+        val expected = rows.associate { r -> Triple(bit(r[0]), bit(r[1]), bit(r[2])) to bit(r[3]) }
+        assertEquals("duplicate rows in catchup-table.txt", rows.size, expected.size)
+
+        var checked = 0
+        for (lb in listOf(false, true)) for (counted in listOf(false, true)) for (net in listOf(false, true)) {
+            val key = Triple(lb, counted, net)
+            val want = expected[key] ?: run { fail("no row for $key"); return }
+            assertEquals("row $key", want, countsAsCatchUp(lb, counted, net))
+            checked++
+        }
+        // 2 x 2 x 2
+        assertEquals(8, checked)
+        assertEquals(8, rows.size)
+    }
+
+    @Test
     fun frameActionMatchesTheTableForEveryCombination() {
         val rows = table("frame-table.txt")
         val expected = rows.associate { r ->

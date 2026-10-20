@@ -136,8 +136,11 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
     /** Native mirror thread. */
     fun onFrame(data: ByteArray, ptsNs: Long) {
         val h = handler ?: run { startSession(); handler } ?: return
+        // arrival taken here, not on the video thread: a busy or restarting decoder must not
+        // look like a late network (T-31c)
+        val arrivedAtUs = System.nanoTime() / 1000
         val frame = Frame(data, ptsNs / 1000, isH264Keyframe(data))
-        h.post { handleFrame(frame) }
+        h.post { handleFrame(frame, arrivedAtUs) }
     }
 
     /** UI thread, from surfaceCreated. */
@@ -170,9 +173,9 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
 
     // ---- video thread ----
 
-    private fun handleFrame(frame: Frame) {
+    private fun handleFrame(frame: Frame, arrivedAtUs: Long) {
         framesIn++
-        pacer.onReceived(frame.ptsUs)
+        pacer.onReceived(frame.ptsUs, arrivedAtUs)
         gop.add(frame)
         if (codec == null) {
             startCodec()

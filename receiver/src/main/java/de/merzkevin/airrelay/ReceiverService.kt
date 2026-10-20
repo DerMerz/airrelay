@@ -39,6 +39,8 @@ import de.merzkevin.airrelay.bridge.NativeBridge
 import de.merzkevin.airrelay.bridge.NativeCallbacks
 import de.merzkevin.airrelay.core.Entitlement
 import de.merzkevin.airrelay.core.LicenseGate
+import de.merzkevin.airrelay.core.NetworkCatchUps
+import de.merzkevin.airrelay.core.NetworkKey
 import de.merzkevin.airrelay.core.ReceiverConfig
 import de.merzkevin.airrelay.core.ReceiverState
 import de.merzkevin.airrelay.core.ServerStatus
@@ -102,8 +104,9 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     private var nsdRegistrations = ArrayList<NsdManager.RegistrationListener>()
     private var startedName: String? = null
     private var startedIp: String? = null
-    /** Phases in which the picture fell behind since the receiver started on this network. */
-    private var catchUpsOnNetwork = 0L
+    /** Phases in which the picture fell behind since the receiver started, on the network the
+     *  stick is on now: another network or band starts again at 0 (memory only). */
+    private val catchUpsOnNetwork = NetworkCatchUps()
 
     private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var senderDb = 0f
@@ -232,11 +235,14 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
      * the advice is worth showing: always when [announce] (receiver ready, mirroring starts),
      * otherwise only if the advice changed (the picture fell behind once more).
      */
-    private fun refreshWifiAdvice(announce: Boolean) {
+    private fun refreshWifiAdvice(announce: Boolean, catchUp: Boolean = false) {
         var rssi: Int? = null
         var freq: Int? = null
+        var network: Long? = null
         try {
-            val caps = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+            val active = connectivity.activeNetwork
+            network = active?.networkHandle
+            val caps = connectivity.getNetworkCapabilities(active)
             if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
                 @Suppress("DEPRECATION")
                 val info = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
@@ -246,8 +252,10 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         } catch (e: Exception) {
             Log.w(TAG, "Wi-Fi signal not readable: ${e.message}")
         }
-        val advice = wifiAdvice(rssiClass(rssi), bandClass(freq), catchUpClass(catchUpsOnNetwork))
-        Log.i(TAG, "Wi-Fi rssi=$rssi dBm freq=$freq MHz catchUps=$catchUpsOnNetwork -> $advice")
+        val key = NetworkKey(network, bandClass(freq))
+        val catchUps = if (catchUp) catchUpsOnNetwork.add(key) else catchUpsOnNetwork.countOn(key)
+        val advice = wifiAdvice(rssiClass(rssi), key.band, catchUpClass(catchUps))
+        Log.i(TAG, "Wi-Fi rssi=$rssi dBm freq=$freq MHz network=$network catchUps=$catchUps -> $advice")
         update { it.withWifiAdvice(advice, announce) }
     }
 
@@ -263,7 +271,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         }
         startedName = null
         startedIp = null
-        catchUpsOnNetwork = 0
+        catchUpsOnNetwork.reset()
         renderer.stopSession()
         update { it.withoutSession() }
     }
@@ -449,10 +457,8 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     override fun onFirstFrameRendered() = update { it.copy(firstFrameShown = true) }
 
     override fun onCatchUp(phases: Long) {
-        server.post {
-            catchUpsOnNetwork++
-            refreshWifiAdvice(announce = false)
-        }
+        // counted on the network the stick is on at this moment
+        server.post { refreshWifiAdvice(announce = false, catchUp = true) }
     }
 
     // ---- helpers ----

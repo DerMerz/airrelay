@@ -52,8 +52,8 @@ android {
         // Fire OS 6 (Android 7.1) and newer; the measured target is Fire OS 7 (API 28)
         minSdk = 24
         targetSdk = 36
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
         buildConfigField("String", "SOURCE_URL", "\"$sourceUrl\"")
 
         ndk {

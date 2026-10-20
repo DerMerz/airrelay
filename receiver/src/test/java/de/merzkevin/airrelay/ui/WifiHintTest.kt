@@ -111,6 +111,62 @@ class WifiHintTest {
         assertEquals(false, shown(a))
     }
 
+    // ---- OK takes the hint away and does nothing else (T-31c, Prüfer 0.1.3 Befund 3) ----
+
+    private fun licenses(a: MainActivity) = a.findViewById<View>(R.id.licenses_panel).visibility
+
+    private fun press(a: MainActivity, code: Int) {
+        a.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code))
+        a.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_UP, code))
+        ShadowLooper.idleMainLooper()
+    }
+
+    @Test fun theFirstOkOnlyTakesTheHintAway() {
+        for (code in listOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER)) {
+            val a = open().get()
+            a.onStateChanged(waiting(WifiAdvice.BUSY_24GHZ, ++seq))
+            assertEquals(true, shown(a))
+            // (Robolectric's currentFocus stays null without window focus; the view knows it)
+            assertEquals("key $code: the licences button has the focus", true,
+                a.findViewById<View>(R.id.licenses_button).isFocused)
+            press(a, code)
+            assertEquals("key $code: hint gone", false, shown(a))
+            assertEquals("key $code: the focused button was not pressed", View.GONE, licenses(a))
+            // the next OK is a normal OK again: it opens what has the focus
+            press(a, code)
+            assertEquals("key $code: the second OK presses the button", View.VISIBLE, licenses(a))
+        }
+    }
+
+    @Test fun okHeldDownWhileTakingTheHintAwayPressesNothing() {
+        val a = open().get()
+        a.onStateChanged(waiting(WifiAdvice.WEAK_SIGNAL, ++seq))
+        val code = KeyEvent.KEYCODE_DPAD_CENTER
+        a.dispatchKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, code, 0))
+        for (r in 1..5) assertEquals(true, a.dispatchKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_DOWN, code, r)))
+        assertEquals("its release goes nowhere", true, a.dispatchKeyEvent(KeyEvent(0, 0, KeyEvent.ACTION_UP, code, 0)))
+        ShadowLooper.idleMainLooper()
+        assertEquals(false, shown(a))
+        assertEquals(View.GONE, licenses(a))
+    }
+
+    @Test fun anOkWithoutHintStillPressesTheButton() {
+        val a = open().get()
+        a.onStateChanged(waiting(WifiAdvice.NONE, seq))
+        press(a, KeyEvent.KEYCODE_DPAD_CENTER)
+        assertEquals(View.VISIBLE, licenses(a))
+    }
+
+    @Test fun aLostReleaseDoesNotSwallowTheNextOk() {
+        val a = open().get()
+        a.onStateChanged(waiting(WifiAdvice.WEAK_SIGNAL, ++seq))
+        val code = KeyEvent.KEYCODE_DPAD_CENTER
+        a.dispatchKeyEvent(KeyEvent(KeyEvent.ACTION_DOWN, code)) // its release never comes
+        assertEquals(false, shown(a))
+        press(a, code)
+        assertEquals(View.VISIBLE, licenses(a))
+    }
+
     @Test fun reopeningTheAppDoesNotRepeatAHintAlreadySeen() {
         val c = open()
         val st = waiting(WifiAdvice.WEAK_SIGNAL, ++seq)

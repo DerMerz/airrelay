@@ -81,6 +81,24 @@ fun frameTarget(onDisplay: Boolean, ptsUs: Long, renderFromPtsUs: Long): FrameTa
 }
 
 /**
+ * Whether a picture opens a new catch-up phase (Aufholphase) for the counter that feeds the
+ * Wi-Fi hint. Pure: no Android, no clock. Full cross product in catchup-table.txt.
+ *
+ * A phase is a run of pictures that are late and behind. It is counted once, and only if the
+ * network delivered late: a decoder restart (Home and back, the app brought to the front, an
+ * overloaded decoder) also leaves the picture late and behind for a moment, but every frame
+ * arrived on time, so that is not the Wi-Fi (T-31c, Prüfer 0.1.3 Befund 1). A phase that
+ * started without network lateness is still counted once the network turns out to be late.
+ *
+ * @param lateAndBehind the picture trails the sound and newer picture is already buffered
+ * @param phaseCounted the current phase was already counted
+ * @param networkLate frames arrived late from the network and the picture has not yet caught
+ *   up past them (see [FramePacer.onReceived])
+ */
+fun countsAsCatchUp(lateAndBehind: Boolean, phaseCounted: Boolean, networkLate: Boolean): Boolean =
+    lateAndBehind && !phaseCounted && networkLate
+
+/**
  * The one place that decides what happens to a decoded picture. Pure: no Android, no clock.
  * Full cross product in frame-table.txt.
  *
@@ -189,26 +207,39 @@ data class PacedFrame(val action: FrameAction, val renderAtUs: Long?)
 class FramePacer {
     private val delayBase = TimedMin(FramePacing.BASELINE_SPAN_US, FramePacing.BASELINE_BUCKET_US)
     private val bufferBase = TimedMin(FramePacing.BASELINE_SPAN_US, FramePacing.BASELINE_BUCKET_US)
+    /** Smallest recent arrival time - picture time: the network delay when all goes well. */
+    private val arrivalBase = TimedMin(FramePacing.BASELINE_SPAN_US, FramePacing.BASELINE_BUCKET_US)
     private var latestReceivedPtsUs: Long? = null
+    /** A frame arrived late from the network and the picture has not caught up since. Set on
+     *  arrival, cleared by the first picture that is no longer late and behind. */
+    private var networkLate = false
     private var lastShownAtUs: Long? = null
     private var lastShownPtsUs = 0L
     private var holdSinceUs: Long? = null
     private var droppedBefore = false
-    private var catchingUp = false
+    private var phaseCounted = false
 
     /** Pictures skipped because they were late. */
     var drops = 0L; private set
     /** Jumps to a newer picture after skipping. */
     var jumps = 0L; private set
-    /** Phases in which the picture fell behind and had to catch up (Aufholphasen). */
+    /** Phases in which the picture fell behind because the network delivered late and had to
+     *  catch up (Aufholphasen). A decoder restart alone never counts. */
     var catchUps = 0L; private set
     /** Shown pictures that followed the previous one faster than [FramePacing.FAST_RATIO]
      *  of their stream distance, outside a jump. Must stay 0. */
     var fastShown = 0L; private set
 
-    /** A frame arrived from the sender (before decoding). */
-    fun onReceived(ptsUs: Long) {
+    /**
+     * A frame arrived from the sender (before decoding). [arrivedAtUs] is taken on the thread
+     * that received it, before it waits for the video thread, so a busy or restarting decoder
+     * never looks like a late network.
+     */
+    fun onReceived(ptsUs: Long, arrivedAtUs: Long) {
         latestReceivedPtsUs = ptsUs
+        val delay = arrivedAtUs - ptsUs
+        arrivalBase.add(arrivedAtUs, delay)
+        if (delay - (arrivalBase.min() ?: delay) > FramePacing.LATE_US) networkLate = true
     }
 
     /** The decoder handed out a picture. */
@@ -217,13 +248,20 @@ class FramePacer {
         delayBase.add(nowUs, nowUs - ptsUs)
         val latest = latestReceivedPtsUs
         if (latest != null) bufferBase.add(nowUs, latest - ptsUs)
+        val late = delayBase.min()?.let { isLate(ptsUs, audioClockUs(nowUs, it)) } ?: false
+        val behind = if (latest == null) false else isBehind(ptsUs, latest, bufferBase.min() ?: 0L)
+        // caught up (on the display or parked): the phase and the late network are over
+        if (!(late && behind)) {
+            networkLate = false
+            phaseCounted = false
+        }
         if (target != FrameTarget.LIVE) return PacedFrame(FrameAction.HIDE, null)
 
         if (holdSinceUs == null) holdSinceUs = nowUs
-        val late = delayBase.min()?.let { isLate(ptsUs, audioClockUs(nowUs, it)) } ?: false
-        val behind = if (latest == null) false else isBehind(ptsUs, latest, bufferBase.min() ?: 0L)
-        if (late && behind && !catchingUp) catchUps++
-        catchingUp = late && behind
+        if (countsAsCatchUp(late && behind, phaseCounted, networkLate)) {
+            catchUps++
+            phaseCounted = true
+        }
 
         val dueAt = lastShownAtUs?.let { paceTargetUs(it, lastShownPtsUs, ptsUs) }
         val action = frameAction(
@@ -256,13 +294,17 @@ class FramePacer {
         return PacedFrame(action, renderAt)
     }
 
-    /** Decoder (re)started: the picture history no longer applies; baselines and counters stay. */
+    /**
+     * Decoder (re)started: the picture history no longer applies; baselines and counters stay.
+     * So does the catch-up phase: a restart in the middle of one (a stall that overflowed the
+     * queue) continues it instead of opening a second one, and the network state is about the
+     * network, which a restart does not change.
+     */
     fun resetOutput() {
         lastShownAtUs = null
         lastShownPtsUs = 0L
         holdSinceUs = null
         droppedBefore = false
-        catchingUp = false
     }
 
     /** New mirroring session: everything from scratch. */
@@ -270,7 +312,10 @@ class FramePacer {
         resetOutput()
         delayBase.clear()
         bufferBase.clear()
+        arrivalBase.clear()
         latestReceivedPtsUs = null
+        networkLate = false
+        phaseCounted = false
         drops = 0
         jumps = 0
         catchUps = 0

@@ -52,6 +52,62 @@ class WifiAdviceTest {
         assertEquals(14, table.size)
     }
 
+    // ---- catch-ups per network (T-31c, Prüfer 0.1.3 Befund 2) ----
+
+    private val homeA = NetworkKey(networkHandle = 100L, band = BandClass.GHZ_24)
+    private val homeB = NetworkKey(networkHandle = 101L, band = BandClass.GHZ_24)
+
+    @Test fun catchUpsCountOnlyOnTheNetworkTheyHappenedOn() {
+        val c = NetworkCatchUps()
+        assertEquals(0L, c.countOn(homeA))
+        assertEquals(1L, c.add(homeA))
+        assertEquals(2L, c.add(homeA))
+        assertEquals(2L, c.countOn(homeA))
+        // the stick joined another network: its first stall is one, not three
+        assertEquals(0L, c.countOn(homeB))
+        assertEquals(1L, c.add(homeB))
+        // and back: the earlier network starts again, the count is not kept per network
+        assertEquals(0L, c.countOn(homeA))
+        assertEquals(1L, c.add(homeA))
+    }
+
+    @Test fun aStallOnANewNetworkStartsItsCountAtOne() {
+        val c = NetworkCatchUps()
+        c.add(homeA)
+        c.add(homeA)
+        assertEquals("first phase on B, without a reading in between", 1L, c.add(homeB))
+    }
+
+    @Test fun theSameNetworkOnAnotherBandIsAnotherNetwork() {
+        val c = NetworkCatchUps()
+        c.add(homeA)
+        c.add(homeA)
+        assertEquals(0L, c.countOn(homeA.copy(band = BandClass.GHZ_5_PLUS)))
+        assertEquals(0L, c.countOn(homeA.copy(networkHandle = null)))
+    }
+
+    @Test fun resetForgetsTheNetworkAndTheCount() {
+        val c = NetworkCatchUps()
+        c.add(homeA)
+        c.add(homeA)
+        c.reset()
+        assertEquals(0L, c.countOn(homeA))
+        assertEquals(1L, c.add(homeA))
+    }
+
+    @Test fun twoStallsOnDifferentNetworksShowNoTwoPointFourHint() {
+        val c = NetworkCatchUps()
+        val rssi = rssiClass(-55)
+        var state = ReceiverState()
+        state = state.withWifiAdvice(wifiAdvice(rssi, homeA.band, catchUpClass(c.add(homeA))), announce = false)
+        state = state.withWifiAdvice(wifiAdvice(rssi, homeB.band, catchUpClass(c.add(homeB))), announce = false)
+        assertEquals(WifiAdvice.NONE, state.wifiAdvice)
+        assertEquals(0, state.wifiHintSeq)
+        state = state.withWifiAdvice(wifiAdvice(rssi, homeB.band, catchUpClass(c.add(homeB))), announce = false)
+        assertEquals("two on the same network still warn", WifiAdvice.BUSY_24GHZ, state.wifiAdvice)
+        assertEquals(1, state.wifiHintSeq)
+    }
+
     @Test fun twoCatchUpsAreAPattern() {
         val table = listOf(0L to CatchUpClass.NONE, 1L to CatchUpClass.ONE, 2L to CatchUpClass.MANY,
             3L to CatchUpClass.MANY, 1000L to CatchUpClass.MANY, -1L to CatchUpClass.NONE)

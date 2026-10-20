@@ -203,13 +203,21 @@ class GuardsExistTest {
         val names = mapOf(
             "core/FramePacingTest.kt" to listOf("afterAStallThePictureJumpsAndNeverRunsInTimeLapse",
                 "theStallReproducesTheTimeLapseOf012", "steadyStreamIsNeverDroppedAndRunsSmoothly",
-                "aLastingLatencyShiftIsNotMistakenForABacklog"),
+                "aLastingLatencyShiftIsNotMistakenForABacklog",
+                // T-31c: a decoder restart is no catch-up phase, a real stall still is
+                "aRestartOnAPerfectNetworkIsNoCatchUpPhase", "aRealStallAfterARestartStillCounts",
+                "twoRestartsOnTwoPointFourGigahertzShowNoHint", "twoRealStallsOnTwoPointFourGigahertzStillShowTheHint",
+                "decoderOverloadWithItsRestartIsNoCatchUpPhase", "aStallThatOverflowsTheQueueCountsOnceDespiteItsRestart",
+                "aDecoderBacklogWithoutALateNetworkIsDroppedButNotCounted"),
             "core/WifiAdviceTest.kt" to listOf("signalIsWeakBelowMinusSeventy", "theStickMeasuredOn19OctoberGetsTheHint",
-                "landscapeOrNarrowStripsLeaveNoPlace"),
+                "landscapeOrNarrowStripsLeaveNoPlace", "catchUpsCountOnlyOnTheNetworkTheyHappenedOn",
+                "twoStallsOnDifferentNetworksShowNoTwoPointFourHint"),
             "core/DecisionTablesTest.kt" to listOf("frameActionMatchesTheTableForEveryCombination",
-                "wifiAdviceMatchesTheTableForEveryCombination", "wifiHintPlaceMatchesTheTableForEveryCombination"),
+                "wifiAdviceMatchesTheTableForEveryCombination", "wifiHintPlaceMatchesTheTableForEveryCombination",
+                "catchUpCountMatchesTheTableForEveryCombination"),
             "ui/WifiHintTest.kt" to listOf("itGoesByItselfAfterTwelveSecondsAndStaysGone", "anyKeyOfTheRemoteTakesItAway",
-                "reopeningTheAppDoesNotRepeatAHintAlreadySeen"),
+                "reopeningTheAppDoesNotRepeatAHintAlreadySeen", "theFirstOkOnlyTakesTheHintAway",
+                "okHeldDownWhileTakingTheHintAwayPressesNothing"),
             "ui/ScreenFitTest.kt" to listOf("R.id.wifi_hint_video", "lies on the picture", "expectShown(a, R.id.wifi_hint_video"),
         )
         for ((path, wanted) in names) {
@@ -226,11 +234,15 @@ class GuardsExistTest {
         val r = File(moduleDir, "src/main/java/de/merzkevin/airrelay/video/VideoRenderer.kt").readText()
         // (text pins: MediaCodec and WifiManager do not run in unit tests; the stick run checks them)
         for (s in listOf("pacer.onOutput(", "FrameAction.HIDE, FrameAction.DROP -> c.releaseOutputBuffer(index, false)",
-                "FrameAction.PACE -> c.releaseOutputBuffer(index, paced.renderAtUs!! * 1000)", "listener.onCatchUp(")) {
+                "FrameAction.PACE -> c.releaseOutputBuffer(index, paced.renderAtUs!! * 1000)", "listener.onCatchUp(",
+                // T-31c: arrival stamped on the native thread, before the video thread can be busy
+                "val arrivedAtUs = System.nanoTime() / 1000", "pacer.onReceived(frame.ptsUs, arrivedAtUs)")) {
             assertTrue("VideoRenderer lost \"$s\"", r.contains(s))
         }
         val svc = File(moduleDir, "src/main/java/de/merzkevin/airrelay/ReceiverService.kt").readText()
-        for (s in listOf("catchUpsOnNetwork++", "refreshWifiAdvice(announce = true)", "it.withWifiAdvice(advice, announce)",
+        // T-31c: counted on the network the stick is on (NetworkCatchUps), not since the start
+        for (s in listOf("catchUpsOnNetwork.add(key)", "NetworkKey(network, bandClass(freq))",
+                "refreshWifiAdvice(announce = false, catchUp = true)", "refreshWifiAdvice(announce = true)", "it.withWifiAdvice(advice, announce)",
                 "it.restarting(name, ip)")) {
             assertTrue("ReceiverService lost \"$s\"", svc.contains(s))
         }

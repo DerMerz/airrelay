@@ -1,0 +1,16 @@
+# Catch-up phases for the Wi-Fi hint (T-31c, Prüfer 0.1.3 Befund 1). 2 x 2 x 2 = 8 rows.
+# lateAndBehind: the picture trails the sound by more than 100 ms and newer picture is buffered.
+# counted: this run of late pictures was already counted.
+# netLate: frames arrived late from the network and the picture has not caught up past them.
+# Reading: only a late picture can open a phase, only once per run, and only when the network
+# delivered late. A decoder restart on a perfect network (Home and back, decoder overload) makes
+# the picture late too, but every frame arrived on time: that is not the Wi-Fi.
+# late+behind  counted  netLate -> count
+0              0        0          0
+0              0        1          0
+0              1        0          0
+0              1        1          0
+1              0        0          0
+1              0        1          1
+1              1        0          0
+1              1        1          0

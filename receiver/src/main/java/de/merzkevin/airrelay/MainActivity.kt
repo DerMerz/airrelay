@@ -82,6 +82,9 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
     private lateinit var wifiHintVideo: TextView
     /** The Wi-Fi hint is on screen (until a key, the timeout or another screen). */
     private var wifiHintActive = false
+    /** Key code of the OK press that only took the Wi-Fi hint away; its repeats and its
+     *  release are swallowed too. KEYCODE_UNKNOWN when none. */
+    private var okTookHintAway = KeyEvent.KEYCODE_UNKNOWN
     private lateinit var waitingPanel: View
     private lateinit var statusLabel: TextView
     private lateinit var titleText: TextView
@@ -574,6 +577,11 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
         private var wifiSeqSeen = 0
 
         private const val PILLAR_MARGIN_DP = 20
+
+        /** Keys that press the focused button (View.onKeyUp's confirm keys, plus the A button
+         *  of a game controller, which Fire OS maps to OK). */
+        private val OK_KEYS = setOf(KeyEvent.KEYCODE_DPAD_CENTER, KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER, KeyEvent.KEYCODE_SPACE, KeyEvent.KEYCODE_BUTTON_A)
     }
 
     private fun openNetworkSettings() {
@@ -589,10 +597,27 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
     // ---- keys ----
 
     override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        // any key of the remote takes the Wi-Fi hint away and still does what it does
+        val swallowed = okTookHintAway
+        if (swallowed != KeyEvent.KEYCODE_UNKNOWN && event.keyCode == swallowed) {
+            // the rest of the OK press that took the hint away: held (repeats) and released
+            if (event.action == KeyEvent.ACTION_UP) {
+                okTookHintAway = KeyEvent.KEYCODE_UNKNOWN
+                return true
+            }
+            if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount > 0) return true
+            // a new press although the release never came (focus moved away): it counts
+            okTookHintAway = KeyEvent.KEYCODE_UNKNOWN
+        }
+        // any key of the remote takes the Wi-Fi hint away; OK does only that (T-31c, Prüfer
+        // 0.1.3 Befund 3: it also pressed the focused button). Every other key still does what
+        // it does, Back included.
         if (event.action == KeyEvent.ACTION_DOWN && wifiHintActive) {
             main.removeCallbacks(hideWifiHint)
             hideWifiHint.run()
+            if (event.keyCode in OK_KEYS) {
+                okTookHintAway = event.keyCode
+                return true
+            }
         }
         return super.dispatchKeyEvent(event)
     }
