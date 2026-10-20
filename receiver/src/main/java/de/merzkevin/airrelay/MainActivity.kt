@@ -32,23 +32,29 @@ import de.merzkevin.airrelay.billing.Subscriptions
 import de.merzkevin.airrelay.core.Access
 import de.merzkevin.airrelay.core.BackAction
 import de.merzkevin.airrelay.core.FontScale
+import de.merzkevin.airrelay.core.HintPlace
 import de.merzkevin.airrelay.core.LicenseGate
 import de.merzkevin.airrelay.core.OfferMessage
 import de.merzkevin.airrelay.core.ReceiverConfig
 import de.merzkevin.airrelay.core.ReceiverState
+import de.merzkevin.airrelay.core.Rect
 import de.merzkevin.airrelay.core.Screen
 import de.merzkevin.airrelay.core.Size
 import de.merzkevin.airrelay.core.Skus
 import de.merzkevin.airrelay.core.TermLabel
+import de.merzkevin.airrelay.core.WifiAdvice
+import de.merzkevin.airrelay.core.WifiThresholds
 import de.merzkevin.airrelay.core.afterAttempt
 import de.merzkevin.airrelay.core.backActionFor
 import de.merzkevin.airrelay.core.fitCentered
+import de.merzkevin.airrelay.core.hintSlot
 import de.merzkevin.airrelay.core.isError
 import de.merzkevin.airrelay.core.monthlyEquivalent
 import de.merzkevin.airrelay.core.offerHeadlineTrialDays
 import de.merzkevin.airrelay.core.showsOffer
 import de.merzkevin.airrelay.core.showsVideo
 import de.merzkevin.airrelay.core.termText
+import de.merzkevin.airrelay.core.wifiHintPlace
 import de.merzkevin.airrelay.core.yearlySavingPercent
 import de.merzkevin.airrelay.video.VideoRenderer
 
@@ -72,6 +78,10 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
     private lateinit var videoSurface: SurfaceView
     private lateinit var connectingText: TextView
     private lateinit var stopHint: TextView
+    private lateinit var wifiHint: TextView
+    private lateinit var wifiHintVideo: TextView
+    /** The Wi-Fi hint is on screen (until a key, the timeout or another screen). */
+    private var wifiHintActive = false
     private lateinit var waitingPanel: View
     private lateinit var statusLabel: TextView
     private lateinit var titleText: TextView
@@ -126,6 +136,12 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
         stopHint.visibility = View.GONE
     }
 
+    private val hideWifiHint = Runnable {
+        wifiHintActive = false
+        wifiHint.visibility = View.GONE
+        wifiHintVideo.visibility = View.GONE
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
@@ -133,6 +149,8 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
         videoSurface = findViewById(R.id.video_surface)
         connectingText = findViewById(R.id.connecting_text)
         stopHint = findViewById(R.id.stop_hint)
+        wifiHint = findViewById(R.id.wifi_hint)
+        wifiHintVideo = findViewById(R.id.wifi_hint_video)
         waitingPanel = findViewById(R.id.waiting_panel)
         statusLabel = findViewById(R.id.status_label)
         titleText = findViewById(R.id.title_text)
@@ -229,6 +247,7 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
         service = null
         unbindService(connection)
         main.removeCallbacks(hideStopHint)
+        main.removeCallbacks(hideWifiHint)
         super.onStop()
     }
 
@@ -265,9 +284,10 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
         connectingText.visibility = if (s == Screen.CONNECTING) View.VISIBLE else View.GONE
         if (video) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-            layoutVideo(state.videoSize)
+            renderWifiHint(s, state, layoutVideo(state.videoSize))
             return
         }
+        renderWifiHint(s, state, null)
         window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
 
         val locked = s == Screen.LOCKED
@@ -452,23 +472,71 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
         else -> 34f
     }
 
-    private fun layoutVideo(size: Size?) {
+    /** Sizes the picture; returns where it lies in the frame, or null while unknown. */
+    private fun layoutVideo(size: Size?): Rect? {
         val container = Size(videoFrame.width, videoFrame.height)
         val lp = videoSurface.layoutParams as FrameLayout.LayoutParams
-        val wanted = if (size == null || !container.isValid) {
+        val placed = if (size != null && container.isValid) fitCentered(size, container) else null
+        val wanted = if (placed == null) {
             FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT)
         } else {
-            val r = fitCentered(size, container)
-            FrameLayout.LayoutParams(r.width, r.height)
+            FrameLayout.LayoutParams(placed.width, placed.height)
         }
         wanted.gravity = Gravity.CENTER
         if (lp.width != wanted.width || lp.height != wanted.height) {
             videoSurface.layoutParams = wanted
         }
         if (size != null && !container.isValid) {
-            // first layout pass not done yet: try again once the frame has a size
-            videoFrame.post { if (lastState.videoSize == size) layoutVideo(size) }
+            // first layout pass not done yet: try again once the frame has a size (the Wi-Fi
+            // hint beside the picture depends on it too, so the whole picture screen again)
+            videoFrame.post { if (lastState.videoSize == size) render(lastState) }
         }
+        return placed
+    }
+
+    /**
+     * The Wi-Fi hint (T-31b): one line on the waiting screen, or in the free strip beside a
+     * portrait picture, never over the picture. Each raise of the service's counter is shown
+     * once, when a place for it exists; a hint raised during a landscape picture therefore
+     * appears on the waiting screen afterwards. Any key or the timeout takes it away.
+     */
+    private fun renderWifiHint(s: Screen, state: ReceiverState, video: Rect?) {
+        val d = resources.displayMetrics.density
+        val container = Size(videoFrame.width, videoFrame.height)
+        val slot = if (video != null && container.isValid) hintSlot(video, container, (WifiThresholds.PILLAR_MIN_DP * d).toInt()) else null
+        val place = wifiHintPlace(s, state.wifiAdvice, slot != null)
+        if (place == HintPlace.NONE) {
+            if (wifiHintActive) {
+                main.removeCallbacks(hideWifiHint)
+                hideWifiHint.run()
+            }
+            return
+        }
+        if (state.wifiHintSeq != wifiSeqSeen) {
+            wifiSeqSeen = state.wifiHintSeq
+            wifiHintActive = true
+            main.removeCallbacks(hideWifiHint)
+            main.postDelayed(hideWifiHint, WifiThresholds.HINT_SHOW_MS)
+        }
+        if (!wifiHintActive) return
+        val text = when (state.wifiAdvice) {
+            WifiAdvice.WEAK_SIGNAL -> R.string.wifi_weak
+            WifiAdvice.BUSY_24GHZ -> R.string.wifi_busy_24ghz
+            WifiAdvice.NONE -> return
+        }
+        val view = if (place == HintPlace.PILLAR) wifiHintVideo else wifiHint
+        (if (place == HintPlace.PILLAR) wifiHint else wifiHintVideo).visibility = View.GONE
+        view.setText(text)
+        if (place == HintPlace.PILLAR && slot != null) {
+            val margin = (PILLAR_MARGIN_DP * d).toInt()
+            val lp = FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT,
+                Gravity.START or Gravity.CENTER_VERTICAL)
+            lp.leftMargin = slot.left + margin
+            val old = view.layoutParams as FrameLayout.LayoutParams
+            if (old.leftMargin != lp.leftMargin || old.gravity != lp.gravity) view.layoutParams = lp
+            if (view.maxWidth != slot.width - 2 * margin) view.maxWidth = slot.width - 2 * margin
+        }
+        view.visibility = View.VISIBLE
     }
 
     // ---- licences ----
@@ -500,6 +568,12 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
         /** Whether the activity is on screen; the service skips the Fire OS 8 alert then. */
         @Volatile var visible = false
             private set
+
+        /** Last Wi-Fi hint counter shown. Lives with the process, like the service's counter,
+         *  so reopening the app does not repeat a hint that was already seen. Main thread. */
+        private var wifiSeqSeen = 0
+
+        private const val PILLAR_MARGIN_DP = 20
     }
 
     private fun openNetworkSettings() {
@@ -513,6 +587,15 @@ class MainActivity : Activity(), ReceiverService.Listener, SurfaceHolder.Callbac
     }
 
     // ---- keys ----
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        // any key of the remote takes the Wi-Fi hint away and still does what it does
+        if (event.action == KeyEvent.ACTION_DOWN && wifiHintActive) {
+            main.removeCallbacks(hideWifiHint)
+            hideWifiHint.run()
+        }
+        return super.dispatchKeyEvent(event)
+    }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
         if (keyCode != KeyEvent.KEYCODE_BACK) return super.onKeyDown(keyCode, event)

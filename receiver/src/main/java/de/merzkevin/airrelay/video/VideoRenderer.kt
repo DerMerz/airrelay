@@ -18,11 +18,14 @@ import android.util.Log
 import android.view.Surface
 import de.merzkevin.airrelay.core.DecoderInfo
 import de.merzkevin.airrelay.core.Frame
+import de.merzkevin.airrelay.core.FrameAction
+import de.merzkevin.airrelay.core.FramePacer
 import de.merzkevin.airrelay.core.GopBuffer
 import de.merzkevin.airrelay.core.InputQueue
 import de.merzkevin.airrelay.core.ReceiverConfig
 import de.merzkevin.airrelay.core.Size
 import de.merzkevin.airrelay.core.chooseDecoder
+import de.merzkevin.airrelay.core.frameTarget
 import de.merzkevin.airrelay.core.isH264Keyframe
 import de.merzkevin.airrelay.core.lowLatencyLadder
 import de.merzkevin.airrelay.core.visibleSize
@@ -46,6 +49,11 @@ import java.util.concurrent.TimeUnit
  *    last keyframe (picture at once, even if the sender shows a still image); if that group
  *    was too large to keep, the running decoder is switched over with setOutputSurface and
  *    the picture appears with the next frame.
+ *
+ * Pacing (T-31b): a picture is no longer shown the moment the decoder hands it out. After a
+ * Wi-Fi stall that replayed the backlog in time-lapse while the sound was already live; now
+ * late pictures are skipped and the newest one is shown, the rest keeps its stream distance.
+ * Decision in [de.merzkevin.airrelay.core.frameAction], state in [FramePacer].
  */
 class VideoRenderer(private val listener: Listener, private val codecSize: Size) {
 
@@ -54,6 +62,8 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
         fun onVideoSize(size: Size)
         /** The first picture of this decoder run is on the display. Any thread. */
         fun onFirstFrameRendered()
+        /** The picture fell behind and had to catch up; [phases] counts this session. Video thread. */
+        fun onCatchUp(phases: Long)
     }
 
     private val sessionLock = Any()
@@ -74,11 +84,20 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
     private var firstFrameSeen = false
     private var decoder: DecoderInfo? = null
     private var lastSize: Size? = null
+    private val pacer = FramePacer()
 
     // counters for logs and the debug feed, written on the video thread
     @Volatile var framesIn = 0L; private set
     @Volatile var framesRendered = 0L; private set
     @Volatile var restarts = 0L; private set
+    /** Pictures skipped because they were late (T-31b). */
+    @Volatile var drops = 0L; private set
+    /** Jumps to the newest picture after skipping. */
+    @Volatile var jumps = 0L; private set
+    /** Phases in which the picture fell behind (Aufholphasen). */
+    @Volatile var catchUps = 0L; private set
+    /** Pictures shown faster than their stream distance outside a jump. Must stay 0. */
+    @Volatile var fastShown = 0L; private set
 
     fun startSession() = synchronized(sessionLock) {
         if (thread != null) return@synchronized
@@ -88,6 +107,12 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
         framesIn = 0
         framesRendered = 0
         restarts = 0
+        drops = 0
+        jumps = 0
+        catchUps = 0
+        fastShown = 0
+        // the pacer belongs to the video thread; the first thing the new one does
+        handler?.post { pacer.resetSession() }
     }
 
     fun stopSession() = synchronized(sessionLock) {
@@ -104,7 +129,8 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
         thread?.quitSafely()
         thread = null
         handler = null
-        Log.i(TAG, "session stopped: in=$framesIn rendered=$framesRendered restarts=$restarts")
+        Log.i(TAG, "session stopped: in=$framesIn rendered=$framesRendered restarts=$restarts " +
+            "drops=$drops jumps=$jumps catchUps=$catchUps fastShown=$fastShown")
     }
 
     /** Native mirror thread. */
@@ -146,6 +172,7 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
 
     private fun handleFrame(frame: Frame) {
         framesIn++
+        pacer.onReceived(frame.ptsUs)
         gop.add(frame)
         if (codec == null) {
             startCodec()
@@ -242,6 +269,7 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
             return
         }
         firstFrameSeen = false
+        pacer.resetOutput()
         val group = gop.snapshot()
         renderFromPtsUs = group.last().ptsUs
         queue.replaceWith(group)
@@ -297,11 +325,26 @@ class VideoRenderer(private val listener: Listener, private val codecSize: Size)
 
         override fun onOutputBufferAvailable(c: MediaCodec, index: Int, info: MediaCodec.BufferInfo) {
             if (c !== codec) return
-            val render = outputOnDisplay && info.presentationTimeUs >= renderFromPtsUs
+            val target = frameTarget(outputOnDisplay, info.presentationTimeUs, renderFromPtsUs)
+            val paced = pacer.onOutput(info.presentationTimeUs, System.nanoTime() / 1000, target)
             try {
-                c.releaseOutputBuffer(index, render)
+                when (paced.action) {
+                    // as up to 0.1.2: on the display at the next refresh
+                    FrameAction.SHOW, FrameAction.JUMP -> c.releaseOutputBuffer(index, true)
+                    // same clock as System.nanoTime, as releaseOutputBuffer expects
+                    FrameAction.PACE -> c.releaseOutputBuffer(index, paced.renderAtUs!! * 1000)
+                    FrameAction.HIDE, FrameAction.DROP -> c.releaseOutputBuffer(index, false)
+                }
             } catch (e: IllegalStateException) {
                 Log.w(TAG, "releaseOutputBuffer failed: ${e.message}")
+            }
+            drops = pacer.drops
+            jumps = pacer.jumps
+            fastShown = pacer.fastShown
+            if (pacer.catchUps != catchUps) {
+                catchUps = pacer.catchUps
+                Log.i(TAG, "picture fell behind, catching up by skipping (phase $catchUps)")
+                listener.onCatchUp(catchUps)
             }
         }
 

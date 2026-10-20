@@ -271,6 +271,23 @@
         android:textSize="16sp"
         tools:text="IP-Adresse 192.168.8.11" />
 
+    <!-- Wi-Fi hint on the waiting screen (T-31b): one line between the how-to and the IP -->
+    <TextView
+        android:id="@+id/wifi_hint"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|start"
+        android:layout_marginStart="72dp"
+        android:layout_marginBottom="68dp"
+        android:maxWidth="640dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:focusable="false"
+        android:textColor="@color/warning"
+        android:textSize="16sp"
+        android:visibility="gone"
+        tools:text="@string/wifi_weak" />
+
     <TextView
         android:id="@+id/licenses_button"
         style="@style/TvButton"
@@ -322,6 +339,21 @@
             android:textColor="@color/text_primary"
             android:textSize="22sp"
             android:visibility="gone" />
+
+        <!-- Wi-Fi hint beside a portrait picture (T-31b), placed in the free strip by code,
+             never over the picture -->
+        <TextView
+            android:id="@+id/wifi_hint_video"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="start|center_vertical"
+            android:maxLines="5"
+            android:ellipsize="end"
+            android:focusable="false"
+            android:textColor="@color/warning"
+            android:textSize="20sp"
+            android:visibility="gone"
+            tools:text="@string/wifi_weak" />
     </FrameLayout>
 
     <!-- licences, opened from the waiting screen -->

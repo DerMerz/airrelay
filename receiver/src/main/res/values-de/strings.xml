@@ -17,6 +17,8 @@
 
     <string name="connecting">Verbindung wird hergestellt …</string>
     <string name="stop_hint">Zum Beenden der Spiegelung noch einmal Zurück drücken</string>
+    <string name="wifi_weak">Schwaches WLAN: Das Bild kann stocken. Ein WLAN-Verstärker hilft.</string>
+    <string name="wifi_busy_24ghz">Im 2,4-GHz-WLAN stockt das Bild. Mit 5 GHz läuft es flüssiger.</string>
 
     <string name="audio_body">Der Ton von deinem iPhone oder iPad läuft über diesen Fernseher.</string>
 

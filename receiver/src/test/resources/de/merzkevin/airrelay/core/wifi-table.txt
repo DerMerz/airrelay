@@ -1,0 +1,34 @@
+# Wi-Fi advice (T-31b). 3 signal classes x 3 bands x 3 catch-up classes = 27 rows.
+# rssi: WEAK below -70 dBm, STRONG at or above, UNKNOWN when not on Wi-Fi or unreadable.
+# band: GHZ_24 2400..2500 MHz, GHZ_5_PLUS from 4900 MHz, UNKNOWN otherwise.
+# catchUps: phases in which the picture fell behind on this network (NONE 0, ONE 1, MANY 2 or more).
+# Reading: a weak signal is always worth a hint. A good signal only on 2.4 GHz and only after the
+# picture fell behind twice. On 5 GHz with a good signal the network is not the advice to give.
+# rssi    band        catchUps -> advice
+UNKNOWN   UNKNOWN     NONE     NONE
+UNKNOWN   UNKNOWN     ONE      NONE
+UNKNOWN   UNKNOWN     MANY     NONE
+UNKNOWN   GHZ_24      NONE     NONE
+UNKNOWN   GHZ_24      ONE      NONE
+UNKNOWN   GHZ_24      MANY     BUSY_24GHZ
+UNKNOWN   GHZ_5_PLUS  NONE     NONE
+UNKNOWN   GHZ_5_PLUS  ONE      NONE
+UNKNOWN   GHZ_5_PLUS  MANY     NONE
+STRONG    UNKNOWN     NONE     NONE
+STRONG    UNKNOWN     ONE      NONE
+STRONG    UNKNOWN     MANY     NONE
+STRONG    GHZ_24      NONE     NONE
+STRONG    GHZ_24      ONE      NONE
+STRONG    GHZ_24      MANY     BUSY_24GHZ
+STRONG    GHZ_5_PLUS  NONE     NONE
+STRONG    GHZ_5_PLUS  ONE      NONE
+STRONG    GHZ_5_PLUS  MANY     NONE
+WEAK      UNKNOWN     NONE     WEAK_SIGNAL
+WEAK      UNKNOWN     ONE      WEAK_SIGNAL
+WEAK      UNKNOWN     MANY     WEAK_SIGNAL
+WEAK      GHZ_24      NONE     WEAK_SIGNAL
+WEAK      GHZ_24      ONE      WEAK_SIGNAL
+WEAK      GHZ_24      MANY     WEAK_SIGNAL
+WEAK      GHZ_5_PLUS  NONE     WEAK_SIGNAL
+WEAK      GHZ_5_PLUS  ONE      WEAK_SIGNAL
+WEAK      GHZ_5_PLUS  MANY     WEAK_SIGNAL

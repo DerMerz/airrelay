@@ -20,6 +20,8 @@
 
     <string name="connecting">Connecting …</string>
     <string name="stop_hint">Press Back again to stop mirroring</string>
+    <string name="wifi_weak">Weak Wi-Fi: the picture may stutter. A Wi-Fi extender helps.</string>
+    <string name="wifi_busy_24ghz">The picture stutters on 2.4 GHz Wi-Fi. 5 GHz runs smoother.</string>
 
     <string name="audio_body">Sound from your iPhone or iPad is playing on this TV.</string>
 

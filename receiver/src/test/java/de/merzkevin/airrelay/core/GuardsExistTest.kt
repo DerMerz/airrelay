@@ -48,7 +48,7 @@ class GuardsExistTest {
     }
 
     @Test fun decisionTablesExist() {
-        for (n in listOf("screen-table.txt", "back-table.txt", "access-table.txt")) {
+        for (n in listOf("screen-table.txt", "back-table.txt", "access-table.txt", "frame-table.txt", "wifi-table.txt", "hint-table.txt")) {
             assertTrue("$n is missing", File(moduleDir, "src/test/resources/de/merzkevin/airrelay/core/$n").exists())
         }
     }
@@ -196,6 +196,44 @@ class GuardsExistTest {
         val body = layout.substringAfter("android:id=\"@+id/offer_body\"").substringBefore("/>")
         assertTrue("offer_body lost its maximum width", body.contains("android:maxWidth="))
         assertTrue("FontScale.kt is gone", File(moduleDir, "src/main/java/de/merzkevin/airrelay/core/FontScale.kt").exists())
+    }
+
+    @Test fun framePacingAndWifiHintTestsExistAndCannotSkip() {
+        // T-31b: time-lapse after a stall, and the Wi-Fi hint. Deleting a test would leave green.
+        val names = mapOf(
+            "core/FramePacingTest.kt" to listOf("afterAStallThePictureJumpsAndNeverRunsInTimeLapse",
+                "theStallReproducesTheTimeLapseOf012", "steadyStreamIsNeverDroppedAndRunsSmoothly",
+                "aLastingLatencyShiftIsNotMistakenForABacklog"),
+            "core/WifiAdviceTest.kt" to listOf("signalIsWeakBelowMinusSeventy", "theStickMeasuredOn19OctoberGetsTheHint",
+                "landscapeOrNarrowStripsLeaveNoPlace"),
+            "core/DecisionTablesTest.kt" to listOf("frameActionMatchesTheTableForEveryCombination",
+                "wifiAdviceMatchesTheTableForEveryCombination", "wifiHintPlaceMatchesTheTableForEveryCombination"),
+            "ui/WifiHintTest.kt" to listOf("itGoesByItselfAfterTwelveSecondsAndStaysGone", "anyKeyOfTheRemoteTakesItAway",
+                "reopeningTheAppDoesNotRepeatAHintAlreadySeen"),
+            "ui/ScreenFitTest.kt" to listOf("R.id.wifi_hint_video", "lies on the picture", "expectShown(a, R.id.wifi_hint_video"),
+        )
+        for ((path, wanted) in names) {
+            val f = File(moduleDir, "src/test/java/de/merzkevin/airrelay/$path")
+            assertTrue("$path is gone", f.exists())
+            val t = f.readText()
+            assertFalse("$path must not be ignored", Regex("@[\\w.]*Ignore\\b").containsMatchIn(t))
+            for (forbidden in listOf("Assume.", "assumeTrue", "assumeFalse", "assumeNotNull")) {
+                assertFalse("$path must not skip ($forbidden)", t.contains(forbidden))
+            }
+            for (w in wanted) assertTrue("$path lost \"$w\"", t.contains(w))
+        }
+        // the renderer still asks the pacer, and releases every picture through it
+        val r = File(moduleDir, "src/main/java/de/merzkevin/airrelay/video/VideoRenderer.kt").readText()
+        // (text pins: MediaCodec and WifiManager do not run in unit tests; the stick run checks them)
+        for (s in listOf("pacer.onOutput(", "FrameAction.HIDE, FrameAction.DROP -> c.releaseOutputBuffer(index, false)",
+                "FrameAction.PACE -> c.releaseOutputBuffer(index, paced.renderAtUs!! * 1000)", "listener.onCatchUp(")) {
+            assertTrue("VideoRenderer lost \"$s\"", r.contains(s))
+        }
+        val svc = File(moduleDir, "src/main/java/de/merzkevin/airrelay/ReceiverService.kt").readText()
+        for (s in listOf("catchUpsOnNetwork++", "refreshWifiAdvice(announce = true)", "it.withWifiAdvice(advice, announce)",
+                "it.restarting(name, ip)")) {
+            assertTrue("ReceiverService lost \"$s\"", svc.contains(s))
+        }
     }
 
     @Test fun packagingWaitsForTheUnitTests() {

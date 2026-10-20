@@ -72,6 +72,63 @@ class DecisionTablesTest {
     }
 
     @Test
+    fun frameActionMatchesTheTableForEveryCombination() {
+        val rows = table("frame-table.txt")
+        val expected = rows.associate { r ->
+            listOf(r[0], r[1], r[2], r[3], r[4], r[5]) to FrameAction.valueOf(r[6])
+        }
+        assertEquals("duplicate rows in frame-table.txt", rows.size, expected.size)
+
+        val bits = listOf(false, true)
+        var checked = 0
+        for (t in FrameTarget.entries) for (lt in bits) for (bh in bits) for (ts in bits) for (hl in bits) for (db in bits) {
+            val key = listOf(t.name) + listOf(lt, bh, ts, hl, db).map { if (it) "1" else "0" }
+            val want = expected[key] ?: run { fail("no row for $key"); return }
+            assertEquals("row $key", want, frameAction(t, lt, bh, ts, hl, db))
+            checked++
+        }
+        // 3 targets x 2^5; a new target or input must extend the table
+        assertEquals(96, checked)
+        assertEquals(96, rows.size)
+    }
+
+    @Test
+    fun wifiAdviceMatchesTheTableForEveryCombination() {
+        val rows = table("wifi-table.txt")
+        val expected = rows.associate { r -> Triple(r[0], r[1], r[2]) to WifiAdvice.valueOf(r[3]) }
+        assertEquals("duplicate rows in wifi-table.txt", rows.size, expected.size)
+
+        var checked = 0
+        for (r in RssiClass.entries) for (b in BandClass.entries) for (c in CatchUpClass.entries) {
+            val key = Triple(r.name, b.name, c.name)
+            val want = expected[key] ?: run { fail("no row for $key"); return }
+            assertEquals("row $key", want, wifiAdvice(r, b, c))
+            checked++
+        }
+        // 3 x 3 x 3
+        assertEquals(27, checked)
+        assertEquals(27, rows.size)
+    }
+
+    @Test
+    fun wifiHintPlaceMatchesTheTableForEveryCombination() {
+        val rows = table("hint-table.txt")
+        val expected = rows.associate { r -> Triple(r[0], r[1], bit(r[2])) to HintPlace.valueOf(r[3]) }
+        assertEquals("duplicate rows in hint-table.txt", rows.size, expected.size)
+
+        var checked = 0
+        for (screen in Screen.entries) for (a in WifiAdvice.entries) for (p in listOf(false, true)) {
+            val key = Triple(screen.name, a.name, p)
+            val want = expected[key] ?: run { fail("no row for $key"); return }
+            assertEquals("row $key", want, wifiHintPlace(screen, a, p))
+            checked++
+        }
+        // 9 screens x 3 advices x 2
+        assertEquals(54, checked)
+        assertEquals(54, rows.size)
+    }
+
+    @Test
     fun startOutcomeForEveryCombination() {
         // ip present x native ready x port bound, written out
         val table = listOf(

@@ -26,6 +26,7 @@ import de.merzkevin.airrelay.core.ServerStatus
 import de.merzkevin.airrelay.core.Size
 import de.merzkevin.airrelay.core.Skus
 import de.merzkevin.airrelay.core.SubscriptionStatus
+import de.merzkevin.airrelay.core.WifiAdvice
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -57,6 +58,11 @@ import org.robolectric.shadows.ShadowNetworkCapabilities
  *  - two texts, or a text and the picture, that lie on top of each other (steps running into
  *    the IP line).
  * The licence text scrolls by design, so only its width counts.
+ *
+ * The Wi-Fi hint (T-31b) runs on the waiting screen with every name, beside portrait
+ * pictures down to the narrowest strip that carries it, and over a landscape picture
+ * (where it must wait). Additionally it must be there where it was raised, and it must never
+ * lie on the picture.
  *
  * The expected number of checks is pinned (CASES), so a shrinking matrix cannot go
  * unnoticed. GuardsExistTest pins this file.
@@ -202,15 +208,34 @@ class ScreenFitTest {
                 val boxW = v.width - v.totalPaddingLeft - v.totalPaddingRight
                 val boxH = v.height - v.totalPaddingTop - v.totalPaddingBottom
                 var widest = 0f
-                for (i in 0 until l.lineCount) widest = maxOf(widest, l.getLineWidth(i))
+                var widestLine = ""
+                // getLineMax, not getLineWidth: the space at a wrap point is not drawn, and
+                // getLineWidth counts it (T-31b: "Das " 288 px in a 286 px box, glyphs inside)
+                for (i in 0 until l.lineCount) if (l.getLineMax(i) > widest) {
+                    widest = l.getLineMax(i)
+                    widestLine = l.text.subSequence(l.getLineStart(i), l.getLineEnd(i)).toString()
+                }
                 if (v.id == R.id.offer_body) {
                     // the subscription text wraps well before the edge of its box, so a font or
                     // a TV that measures a little wider cannot cut a word (the T-31 report)
                     val d = v.resources.displayMetrics.density
                     if (widest / d > 640f) found += "$where: offer_body is ${widest / d} dp wide, it must wrap at 620 dp"
                 }
-                if (widest > boxW + 0.5f) found += "$where: ${name(v)} text is ${widest.toInt()} px wide in a box of $boxW px"
+                if (widest > boxW + 0.5f) found += "$where: ${name(v)} text is ${widest.toInt()} px wide in a box of $boxW px (line \"$widestLine\", ${l.lineCount} lines, layout ${l.width} px)"
                 if (!insideScroll(v) && l.height > boxH + 0.5f) found += "$where: ${name(v)} text is ${l.height} px high in a box of $boxH px"
+            }
+        }
+        // the Wi-Fi hint never lies on the mirrored picture, and the waiting-screen line is
+        // never shown behind the picture screen
+        val surface = a.findViewById<View>(R.id.video_surface)
+        val frame = a.findViewById<View>(R.id.video_frame)
+        if (frame.visibility == View.VISIBLE) {
+            for (id in listOf(R.id.wifi_hint, R.id.wifi_hint_video)) {
+                val h = a.findViewById<View>(id)
+                if (h.visibility != View.VISIBLE) continue
+                if (id == R.id.wifi_hint) found += "$where: ${name(h)} is up behind the picture screen"
+                val o = windowRect(h)
+                if (o.intersect(windowRect(surface)) && o.width() > 0 && o.height() > 0) found += "$where: ${name(h)} ${windowRect(h)} lies on the picture ${windowRect(surface)}"
             }
         }
         // collisions: texts and the picture on top of each other
@@ -231,10 +256,32 @@ class ScreenFitTest {
     }
 
     private fun state(server: ServerStatus = ServerStatus.RUNNING, name: String = names[0], mirroring: Boolean = false,
-                      firstFrame: Boolean = false, audio: Boolean = false) =
+                      firstFrame: Boolean = false, audio: Boolean = false, video: Size = Size(1920, 1080),
+                      wifi: WifiAdvice = WifiAdvice.NONE, wifiSeq: Int = 0) =
         ReceiverState(server = server, name = name, ip = "192.168.178.255", port = 7000,
             connections = if (mirroring || audio) 1 else 0, mirroring = mirroring, firstFrameShown = firstFrame,
-            audioSession = audio, videoSize = if (mirroring && firstFrame) Size(1920, 1080) else null)
+            audioSession = audio, videoSize = if (mirroring && firstFrame) video else null,
+            wifiAdvice = wifi, wifiHintSeq = wifiSeq)
+
+    /** Hint counter for the Wi-Fi cases; the activity shows each value once per process. */
+    private var wifiSeq = 1000
+
+    private fun expectShown(a: MainActivity, id: Int, where: String) {
+        if (a.findViewById<View>(id).visibility != View.VISIBLE) problems += "$where: ${a.resources.getResourceEntryName(id)} is not shown"
+    }
+
+    private fun expectNoHint(a: MainActivity, where: String) {
+        for (id in listOf(R.id.wifi_hint, R.id.wifi_hint_video)) {
+            if (a.findViewById<View>(id).visibility == View.VISIBLE) problems += "$where: ${a.resources.getResourceEntryName(id)} is shown"
+        }
+    }
+
+    /** A picture screen: the frame gets its size first, as on the stick, then the state again. */
+    private fun showPicture(a: MainActivity, out: Output, st: ReceiverState) {
+        a.onStateChanged(st)
+        settle(a, out)
+        a.onStateChanged(st)
+    }
 
     @Test
     fun noTextOnAnyScreenIsCutOff() {
@@ -295,6 +342,27 @@ class ScreenFitTest {
             a.onKeyDown(KeyEvent.KEYCODE_BACK, KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_BACK))
             check(a, out, "$tag mirroring with stop hint")
             a.onStateChanged(state())
+
+            // the Wi-Fi hint on the waiting screen, both texts, every name
+            for (w in listOf(WifiAdvice.WEAK_SIGNAL, WifiAdvice.BUSY_24GHZ)) for (n in names) {
+                a.onStateChanged(state(name = n, wifi = w, wifiSeq = ++wifiSeq))
+                check(a, out, "$tag wifi $w [$n]")
+                expectShown(a, R.id.wifi_hint, "$tag wifi $w [$n]")
+            }
+            // beside portrait pictures: phone, iPad, and a strip just above the minimum
+            for (v in listOf(Size(886, 1920), Size(1536, 2048), Size(1590, 1960))) for (w in listOf(WifiAdvice.WEAK_SIGNAL, WifiAdvice.BUSY_24GHZ)) {
+                showPicture(a, out, state(mirroring = true, firstFrame = true, video = v, wifi = w, wifiSeq = ++wifiSeq))
+                check(a, out, "$tag wifi $w beside $v")
+                expectShown(a, R.id.wifi_hint_video, "$tag wifi $w beside $v")
+            }
+            // a landscape picture has no free place: the hint waits for the waiting screen
+            showPicture(a, out, state(mirroring = true, firstFrame = true, wifi = WifiAdvice.WEAK_SIGNAL, wifiSeq = ++wifiSeq))
+            check(a, out, "$tag wifi over landscape")
+            expectNoHint(a, "$tag wifi over landscape")
+            a.onStateChanged(state(wifi = WifiAdvice.WEAK_SIGNAL, wifiSeq = wifiSeq))
+            check(a, out, "$tag wifi after landscape")
+            expectShown(a, R.id.wifi_hint, "$tag wifi after landscape")
+            a.onStateChanged(state())
             // licences open
             a.findViewById<View>(R.id.licenses_button).performClick()
             check(a, out, "$tag licences")
@@ -307,8 +375,9 @@ class ScreenFitTest {
     }
 
     companion object {
-        /** 2 outputs x 2 languages x 4 font scales x (1 start + 8 states x 4 names + 7 messages
-         *  + 6 refused + 5 statuses x 4 names + 4 audio + 1 connecting + 1 mirroring + 1 licences). */
-        const val CASES = 2 * 2 * 5 * (1 + 8 * 4 + 7 + 6 + 5 * 4 + 4 + 1 + 1 + 1)
+        /** 2 outputs x 2 languages x 5 font scales x (1 start + 8 states x 4 names + 7 messages
+         *  + 6 refused + 5 statuses x 4 names + 4 audio + 1 connecting + 1 mirroring + 1 licences
+         *  + Wi-Fi: 2 texts x 4 names waiting + 3 portrait pictures x 2 texts + 1 landscape + 1 after). */
+        const val CASES = 2 * 2 * 5 * (1 + 8 * 4 + 7 + 6 + 5 * 4 + 4 + 1 + 1 + 1 + 2 * 4 + 3 * 2 + 1 + 1)
     }
 }

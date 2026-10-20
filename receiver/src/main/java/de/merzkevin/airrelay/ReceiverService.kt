@@ -19,6 +19,7 @@ import android.media.AudioManager
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.Network
+import android.net.NetworkCapabilities
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
@@ -42,13 +43,18 @@ import de.merzkevin.airrelay.core.ReceiverConfig
 import de.merzkevin.airrelay.core.ReceiverState
 import de.merzkevin.airrelay.core.ServerStatus
 import de.merzkevin.airrelay.core.Size
+import de.merzkevin.airrelay.core.WifiAdvice
 import de.merzkevin.airrelay.core.advertisedSize
 import de.merzkevin.airrelay.core.airplayVolumeToGainQ15
+import de.merzkevin.airrelay.core.bandClass
+import de.merzkevin.airrelay.core.catchUpClass
 import de.merzkevin.airrelay.core.deviceIdFor
 import de.merzkevin.airrelay.core.needsFullScreenAlert
 import de.merzkevin.airrelay.core.pickIpv4
 import de.merzkevin.airrelay.core.receiverName
+import de.merzkevin.airrelay.core.rssiClass
 import de.merzkevin.airrelay.core.startOutcome
+import de.merzkevin.airrelay.core.wifiAdvice
 import de.merzkevin.airrelay.video.VideoRenderer
 import java.net.NetworkInterface
 import java.io.File
@@ -59,7 +65,8 @@ import java.io.File
  * and brings the activity to the front when a sender starts mirroring.
  *
  * Idle cost: no timers, no polling. Work happens only on events (sender connects, network
- * or device name changes). The "server" thread only runs start/stop/restart.
+ * or device name changes). The "server" thread only runs start/stop/restart. The Wi-Fi
+ * signal is read at those events too, never on a timer.
  */
 class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
 
@@ -95,6 +102,8 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     private var nsdRegistrations = ArrayList<NsdManager.RegistrationListener>()
     private var startedName: String? = null
     private var startedIp: String? = null
+    /** Phases in which the picture fell behind since the receiver started on this network. */
+    private var catchUpsOnNetwork = 0L
 
     private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var senderDb = 0f
@@ -163,7 +172,8 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         if (handle != 0L) return
         val name = receiverName(Settings.Global.getString(contentResolver, DEVICE_NAME_SETTING))
         val ip = currentIpv4()
-        update { ReceiverState(server = ServerStatus.STARTING, name = name, ip = ip) }
+        // the hint counter keeps counting up, so a screen never mistakes a new hint for one it showed
+        update { it.restarting(name, ip) }
         if (ip == null) {
             finishStart(startOutcome(null, false, null), name, null, 0)
             return
@@ -214,6 +224,31 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     private fun finishStart(status: ServerStatus, name: String, ip: String?, port: Int) {
         if (status != ServerStatus.RUNNING) Log.w(TAG, "receiver not started: $status")
         update { it.copy(server = status, name = name, ip = ip, port = port) }
+        if (status == ServerStatus.RUNNING) refreshWifiAdvice(announce = true)
+    }
+
+    /**
+     * Server thread. Reads the Wi-Fi signal once (no polling) and raises the hint counter when
+     * the advice is worth showing: always when [announce] (receiver ready, mirroring starts),
+     * otherwise only if the advice changed (the picture fell behind once more).
+     */
+    private fun refreshWifiAdvice(announce: Boolean) {
+        var rssi: Int? = null
+        var freq: Int? = null
+        try {
+            val caps = connectivity.getNetworkCapabilities(connectivity.activeNetwork)
+            if (caps?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true) {
+                @Suppress("DEPRECATION")
+                val info = (applicationContext.getSystemService(Context.WIFI_SERVICE) as WifiManager).connectionInfo
+                rssi = info?.rssi
+                freq = info?.frequency
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Wi-Fi signal not readable: ${e.message}")
+        }
+        val advice = wifiAdvice(rssiClass(rssi), bandClass(freq), catchUpClass(catchUpsOnNetwork))
+        Log.i(TAG, "Wi-Fi rssi=$rssi dBm freq=$freq MHz catchUps=$catchUpsOnNetwork -> $advice")
+        update { it.withWifiAdvice(advice, announce) }
     }
 
     private fun stopServer() {
@@ -228,6 +263,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         }
         startedName = null
         startedIp = null
+        catchUpsOnNetwork = 0
         renderer.stopSession()
         update { it.withoutSession() }
     }
@@ -371,9 +407,11 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
             renderer.startSession()
             update { it.copy(mirroring = true, firstFrameShown = false, videoSize = null) }
             main.post { bringToFront(FrontReason.MIRRORING) }
+            server.post { refreshWifiAdvice(announce = true) }
         } else {
             renderer.stopSession()
             update { it.copy(mirroring = false, firstFrameShown = false, videoSize = null) }
+            server.post { refreshWifiAdvice(announce = false) }
         }
     }
 
@@ -409,6 +447,13 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     override fun onVideoSize(size: Size) = update { it.copy(videoSize = size) }
 
     override fun onFirstFrameRendered() = update { it.copy(firstFrameShown = true) }
+
+    override fun onCatchUp(phases: Long) {
+        server.post {
+            catchUpsOnNetwork++
+            refreshWifiAdvice(announce = false)
+        }
+    }
 
     // ---- helpers ----
 
