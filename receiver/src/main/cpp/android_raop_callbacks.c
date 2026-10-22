@@ -1,8 +1,9 @@
 /*
  * Implements raop_callbacks_t for a mirroring-only receiver.
  * Based on android_raop_callbacks.c from jqssun/android-airplay-server (GPL-3.0),
- * reduced to screen mirroring plus its sound; metadata, cover art, DACP, PIN pairing and
- * HLS video are answered natively without calling into Java.
+ * reduced to screen mirroring plus its sound; metadata, cover art, DACP and PIN pairing are
+ * answered natively without calling into Java. HLS video (stream URL handed over by apps
+ * such as YouTube) reaches Kotlin only after android_callbacks_enable_hls.
  *
  * All callbacks fire from RAOP's internal pthreads. A thread is attached to the JVM on its
  * first callback and detached by a pthread key destructor when it exits, so no thread ever
@@ -11,6 +12,8 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+#include <time.h>
 #include <pthread.h>
 #include <android/log.h>
 #include "android_raop_callbacks.h"
@@ -59,6 +62,9 @@ static void _clear_exception(JNIEnv *env) {
 
 int android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject callback_obj) {
     memset(ctx, 0, sizeof(*ctx));
+    pthread_mutex_init(&ctx->playback_lock, NULL);
+    pthread_cond_init(&ctx->play_ready_cond, NULL);
+    ctx->sync_inited = 1;
     (*env)->GetJavaVM(env, &ctx->jvm);
     g_jvm = ctx->jvm;
     ctx->callback_obj = (*env)->NewGlobalRef(env, callback_obj);
@@ -73,6 +79,19 @@ int android_callbacks_init(android_callback_ctx_t *ctx, JNIEnv *env, jobject cal
     ctx->on_conn_destroy = (*env)->GetMethodID(env, cls, "onConnectionDestroy", "()V");
     ctx->on_mirror_running = (*env)->GetMethodID(env, cls, "onMirrorRunning", "(Z)V");
     ctx->on_client_request = (*env)->GetMethodID(env, cls, "onClientRequest", "()Z");
+
+    /* optional: a missing HLS method must never stop mirroring from starting */
+    ctx->on_video_play = (*env)->GetMethodID(env, cls, "onVideoPlay", "(Ljava/lang/String;F)V");
+    _clear_exception(env);
+    ctx->on_video_scrub = (*env)->GetMethodID(env, cls, "onVideoScrub", "(F)V");
+    _clear_exception(env);
+    ctx->on_video_rate = (*env)->GetMethodID(env, cls, "onVideoRate", "(F)V");
+    _clear_exception(env);
+    ctx->on_video_stop = (*env)->GetMethodID(env, cls, "onVideoStop", "()V");
+    _clear_exception(env);
+    ctx->hls_methods_ok = ctx->on_video_play && ctx->on_video_scrub &&
+                          ctx->on_video_rate && ctx->on_video_stop;
+    if (!ctx->hls_methods_ok) LOGI("HLS callback methods missing, HLS video stays off");
     (*env)->DeleteLocalRef(env, cls);
 
     if (!ctx->on_video_data || !ctx->on_audio_format || !ctx->on_volume ||
@@ -91,6 +110,40 @@ void android_callbacks_destroy(android_callback_ctx_t *ctx, JNIEnv *env) {
         (*env)->DeleteGlobalRef(env, ctx->callback_obj);
         ctx->callback_obj = NULL;
     }
+    if (ctx->sync_inited) {
+        ctx->sync_inited = 0;
+        pthread_cond_destroy(&ctx->play_ready_cond);
+        pthread_mutex_destroy(&ctx->playback_lock);
+    }
+}
+
+int android_callbacks_enable_hls(android_callback_ctx_t *ctx) {
+    if (!ctx->hls_methods_ok) return -1;
+    ctx->hls_enabled = 1;
+    return 0;
+}
+
+/* caller holds playback_lock */
+static void _set_snapshot_locked(android_callback_ctx_t *ctx, double position, double duration,
+                                 float rate, int ready) {
+    ctx->playback_position = position;
+    ctx->playback_duration = duration;
+    ctx->playback_rate = rate;
+    ctx->playback_ready = ready;
+    if (ready && !ctx->play_ready) {
+        ctx->play_ready = 1;
+        pthread_cond_broadcast(&ctx->play_ready_cond);
+    }
+}
+
+void android_callbacks_update_playback_info(android_callback_ctx_t *ctx, double position,
+                                            double duration, float rate, int ready) {
+    pthread_mutex_lock(&ctx->playback_lock);
+    /* a late player tick must not overwrite the end marker the sender has not read yet */
+    if (ctx->playback_duration != -1.0 || duration == -1.0) {
+        _set_snapshot_locked(ctx, position, duration, rate, ready);
+    }
+    pthread_mutex_unlock(&ctx->playback_lock);
 }
 
 /* --- forwarded callbacks --- */
@@ -132,6 +185,12 @@ static void _call_void(android_callback_ctx_t *ctx, jmethodID m) {
 
 static void _conn_init(void *cls) {
     android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    if (ctx->hls_enabled) {
+        /* a new connection after a finished video starts from a clean snapshot */
+        pthread_mutex_lock(&ctx->playback_lock);
+        if (ctx->playback_duration == -1.0) _set_snapshot_locked(ctx, 0.0, 0.0, 0.0f, 0);
+        pthread_mutex_unlock(&ctx->playback_lock);
+    }
     _call_void(ctx, ctx->on_conn_init);
 }
 
@@ -241,22 +300,113 @@ static void _video_report_size(void *cls, float *w_src, float *h_src, float *w, 
     LOGI("video size %.0fx%.0f -> %.0fx%.0f", *w_src, *h_src, *w, *h);
 }
 static void _display_pin(void *cls, char *pin) { (void)cls; (void)pin; }
-static void _video_reset(void *cls, reset_type_t t) { (void)cls; LOGI("video_reset %d", t); }
 
-/* HLS video is never announced ("hls" plist 0, feature bits 0 and 4 off); these only
-   exist so a misbehaving sender cannot reach a NULL function pointer */
+/* --- HLS video ---
+   Without android_callbacks_enable_hls these behave as in 0.1.4: HLS is not announced
+   ("hls" plist 0, feature bits 0 and 4 off), and a misbehaving sender gets no-ops. */
+
+static void _video_stop(void *cls) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    if (!ctx->hls_enabled) return;
+    android_callbacks_update_playback_info(ctx, 0.0, -1.0, 0.0f, 0);
+    _call_void(ctx, ctx->on_video_stop);
+}
+
+static void _video_reset(void *cls, reset_type_t t) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    LOGI("video_reset %d", t);
+    if (!ctx->hls_enabled) return;
+    if (t == RESET_TYPE_HLS_SHUTDOWN || t == RESET_TYPE_HLS_EOS) {
+        _video_stop(cls);
+    } else if (t == RESET_TYPE_HLS_CONN_CLOSED) {
+        /* the /play connection went away: abandoned only if ready and paused, because the
+           rate is also 0 while the player is still buffering */
+        pthread_mutex_lock(&ctx->playback_lock);
+        int paused = ctx->playback_ready && ctx->playback_rate <= 0.0f;
+        pthread_mutex_unlock(&ctx->playback_lock);
+        if (paused) _video_stop(cls);
+    }
+    if (t == RESET_TYPE_HLS_SHUTDOWN && ctx->raop) {
+        raop_remove_hls_connections(ctx->raop);
+    }
+}
+
 static void _video_play(void *cls, const char *location, const float start_position) {
-    (void)cls; (void)location; (void)start_position;
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    if (!ctx->hls_enabled || !location) return;
+    LOGI("video_play: %s @ %.2fs", location, start_position);
+    pthread_mutex_lock(&ctx->playback_lock);
+    ctx->play_ready = 0;
+    _set_snapshot_locked(ctx, start_position, 0.0, 0.0f, 0);
+    pthread_mutex_unlock(&ctx->playback_lock);
+
+    JNIEnv *env = _get_env(ctx);
+    if (!env) return;
+    jstring jloc = (*env)->NewStringUTF(env, location);
+    if (!jloc) { _clear_exception(env); return; }
+    (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_video_play, jloc, (jfloat)start_position);
+    _clear_exception(env);
+    (*env)->DeleteLocalRef(env, jloc);
+
+    /* senders read the duration from the first /playback-info after /play; hold the
+       response until the player is ready, at most 10 s */
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec += 10;
+    pthread_mutex_lock(&ctx->playback_lock);
+    while (!ctx->play_ready) {
+        if (pthread_cond_timedwait(&ctx->play_ready_cond, &ctx->playback_lock, &ts) == ETIMEDOUT) break;
+    }
+    pthread_mutex_unlock(&ctx->playback_lock);
 }
-static void _video_scrub(void *cls, const float position) { (void)cls; (void)position; }
-static void _video_rate(void *cls, const float rate) { (void)cls; (void)rate; }
-static void _video_stop(void *cls) { (void)cls; }
+
+static void _video_scrub(void *cls, const float position) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    if (!ctx->hls_enabled) return;
+    JNIEnv *env = _get_env(ctx);
+    if (!env) return;
+    (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_video_scrub, (jfloat)position);
+    _clear_exception(env);
+}
+
+static void _video_rate(void *cls, const float rate) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    if (!ctx->hls_enabled) return;
+    JNIEnv *env = _get_env(ctx);
+    if (!env) return;
+    (*env)->CallVoidMethod(env, ctx->callback_obj, ctx->on_video_rate, (jfloat)rate);
+    _clear_exception(env);
+}
+
+/* httpd thread: reads the snapshot Kotlin pushed, never calls into the player */
 static void _video_acquire_playback_info(void *cls, playback_info_t *info) {
-    (void)cls;
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
     memset(info, 0, sizeof(*info));
-    info->playback_buffer_empty = true;
+    if (!ctx->hls_enabled) {
+        info->playback_buffer_empty = true;
+        return;
+    }
+    pthread_mutex_lock(&ctx->playback_lock);
+    info->position = ctx->playback_position;
+    info->duration = ctx->playback_duration;
+    info->rate = ctx->playback_rate;
+    info->ready_to_play = ctx->playback_ready;
+    info->seek_duration = ctx->playback_duration > 0.0 ? ctx->playback_duration : 0.0;
+    pthread_mutex_unlock(&ctx->playback_lock);
+    info->playback_buffer_empty = false;
+    info->playback_buffer_full = true;
+    info->playback_likely_to_keep_up = true;
+    info->seek_start = 0.0;
 }
-static float _video_playlist_remove(void *cls) { (void)cls; return 0.0f; }
+
+static float _video_playlist_remove(void *cls) {
+    android_callback_ctx_t *ctx = (android_callback_ctx_t *)cls;
+    if (!ctx->hls_enabled) return 0.0f;
+    pthread_mutex_lock(&ctx->playback_lock);
+    double position = ctx->playback_position;
+    pthread_mutex_unlock(&ctx->playback_lock);
+    return (float)position;
+}
 
 void android_callbacks_fill(raop_callbacks_t *cbs, android_callback_ctx_t *ctx) {
     memset(cbs, 0, sizeof(raop_callbacks_t));

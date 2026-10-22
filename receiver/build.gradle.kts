@@ -194,6 +194,10 @@ dependencies {
     // Amazon Appstore SDK (In-App Purchasing v3): a plain 460 KB jar from Maven Central, no
     // transitive dependencies, no manifest of its own (entries are in AndroidManifest.xml).
     implementation("com.amazon.device:amazon-appstore-sdk:3.0.9")
+    // HLS test player (0.1.5 Durchstich): test package only, the store build carries no player
+    // (src/release/.../HlsVideoFactory.kt). HlsGuardTest fails if this becomes "implementation".
+    debugImplementation("androidx.media3:media3-exoplayer:1.8.0")
+    debugImplementation("androidx.media3:media3-exoplayer-hls:1.8.0")
     testImplementation("junit:junit:4.13.2")
     // ScreenFitTest: the screens at the sizes and font scales of a Fire TV, text measured by
     // the real Android text engine (GraphicsMode.NATIVE), not by a stand-in.

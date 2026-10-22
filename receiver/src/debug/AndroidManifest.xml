@@ -1,7 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- debug builds only: lets adb feed a test stream while the app is in the background -->
+<!-- debug builds only: lets adb feed a test stream while the app is in the background,
+     and the HLS test player (picture screen plus plain HTTP to this device only) -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application>
+    <application android:networkSecurityConfig="@xml/hls_localhost">
+        <activity
+            android:name=".video.HlsActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode" />
         <receiver
             android:name=".DebugFeedReceiver"
             android:exported="true"

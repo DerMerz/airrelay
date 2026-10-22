@@ -10,6 +10,10 @@
     public void onConnectionDestroy();
     public void onMirrorRunning(boolean);
     public boolean onClientRequest();
+    public void onVideoPlay(java.lang.String, float);
+    public void onVideoScrub(float);
+    public void onVideoRate(float);
+    public void onVideoStop();
 }
 -keep class de.merzkevin.airrelay.bridge.NativeBridge { native <methods>; }
 

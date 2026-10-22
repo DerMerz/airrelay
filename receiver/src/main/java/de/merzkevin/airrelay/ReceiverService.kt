@@ -38,6 +38,7 @@ import de.merzkevin.airrelay.billing.Subscriptions
 import de.merzkevin.airrelay.bridge.NativeBridge
 import de.merzkevin.airrelay.bridge.NativeCallbacks
 import de.merzkevin.airrelay.core.Entitlement
+import de.merzkevin.airrelay.core.HlsPolicy
 import de.merzkevin.airrelay.core.LicenseGate
 import de.merzkevin.airrelay.core.NetworkCatchUps
 import de.merzkevin.airrelay.core.NetworkKey
@@ -57,6 +58,8 @@ import de.merzkevin.airrelay.core.receiverName
 import de.merzkevin.airrelay.core.rssiClass
 import de.merzkevin.airrelay.core.startOutcome
 import de.merzkevin.airrelay.core.wifiAdvice
+import de.merzkevin.airrelay.video.HlsVideo
+import de.merzkevin.airrelay.video.HlsVideoFactory
 import de.merzkevin.airrelay.video.VideoRenderer
 import java.net.NetworkInterface
 import java.io.File
@@ -111,6 +114,14 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var senderDb = 0f
 
+    /** HLS player, test package only (HlsPolicy); null in the store package. */
+    private var hls: HlsVideo? = null
+
+    /** Player state goes to native code on the server thread, like every other native call. */
+    private val hlsReporter = HlsVideo.Reporter { position, duration, rate, ready ->
+        server.post { if (handle != 0L) NativeBridge.nativeUpdatePlaybackInfo(handle, position, duration, rate, ready) }
+    }
+
     private val nsd by lazy { getSystemService(Context.NSD_SERVICE) as NsdManager }
     private val connectivity by lazy { getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
 
@@ -122,6 +133,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         serverThread = HandlerThread("server").apply { start() }
         server = Handler(serverThread.looper)
         renderer = VideoRenderer(this, codecSize())
+        hls = if (HlsPolicy.enabled(packageName, HlsVideoFactory.AVAILABLE)) HlsVideoFactory.create(this, hlsReporter) else null
         wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "airrelay:session")
             .apply { setReferenceCounted(false) }
@@ -146,6 +158,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         serverThread.quitSafely()
         try { serverThread.join(SERVER_JOIN_MS) } catch (_: InterruptedException) {}
         renderer.stopSession()
+        hls?.release()
         wakeLock?.release()
         super.onDestroy()
     }
@@ -198,6 +211,11 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         if (handle == 0L) {
             finishStart(startOutcome(ip, false, null), name, ip, 0)
             return
+        }
+        if (hls != null) {
+            val locales = resources.configuration.locales
+            val langs = HlsPolicy.systemLanguages((0 until locales.size()).map { locales[it].language })
+            Log.i(TAG, "HLS video ${if (NativeBridge.nativeSetHlsEnabled(handle, langs)) "on" else "NOT available"} ($langs)")
         }
         var port: Int? = null
         for (p in ReceiverConfig.PORTS_TO_TRY) {
@@ -269,6 +287,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
             NativeBridge.nativeDestroy(handle)
             handle = 0L
         }
+        hls?.stop()
         startedName = null
         startedIp = null
         catchUpsOnNetwork.reset()
@@ -424,6 +443,17 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     }
 
     override fun onVideoData(data: ByteArray, ptsNs: Long) = renderer.onFrame(data, ptsNs)
+
+    // ---- HLS video (test package only, see HlsPolicy) ----
+
+    override fun onVideoPlay(url: String, startSec: Float) {
+        Log.i(TAG, "HLS play requested from $startSec s")
+        hls?.play(url, startSec)
+    }
+
+    override fun onVideoScrub(sec: Float) { hls?.scrub(sec) }
+    override fun onVideoRate(rate: Float) { hls?.rate(rate) }
+    override fun onVideoStop() { hls?.stop() }
 
     override fun onAudioFormat(ct: Int, spf: Int, usingScreen: Boolean) {
         val h = handle

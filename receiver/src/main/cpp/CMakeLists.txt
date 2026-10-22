@@ -117,8 +117,8 @@ endforeach()
 # needs the header next to it as well (the llhttp sources stay in ${UXPLAY_LIB}/llhttp).
 configure_file(${UXPLAY_LIB}/llhttp/llhttp.h ${UXPLAY_STAGE}/llhttp/llhttp.h COPYONLY)
 
-# airplay_video.c is only reached with HLS enabled, which this receiver never does, but
-# raop.c links against it.
+# airplay_video.c is only reached with HLS enabled, which only the side-by-side test package
+# does (NativeBridge.nativeSetHlsEnabled, HlsPolicy); raop.c links against it in every build.
 set(UXPLAY_SOURCES
     ${UXPLAY_STAGE}/airplay_video.c
     ${UXPLAY_STAGE}/byteutils.c

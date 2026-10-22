@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Test package only: the HLS player reads the playlist from UxPlay's own HTTP server on this
+     device (http://localhost:<port>/master.m3u8). Plain HTTP is allowed for this device only. -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>

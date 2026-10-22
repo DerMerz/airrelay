@@ -31,4 +31,19 @@ interface NativeCallbacks {
     /** First SETUP of a sender, before any stream exists: true admits it, false makes the
      *  native side answer "403 Forbidden". Called on a UxPlay thread, must not block. */
     fun onClientRequest(): Boolean
+
+    // HLS video, only after NativeBridge.nativeSetHlsEnabled. Called on UxPlay threads,
+    // must not block (onVideoPlay is answered by the next nativeUpdatePlaybackInfo).
+
+    /** The sender hands over a stream: url on the receiver's own HTTP server, start in seconds. */
+    fun onVideoPlay(url: String, startSec: Float)
+
+    /** Seek to sec seconds. */
+    fun onVideoScrub(sec: Float)
+
+    /** 0 pauses, 1 plays. */
+    fun onVideoRate(rate: Float)
+
+    /** The sender ended the video. */
+    fun onVideoStop()
 }

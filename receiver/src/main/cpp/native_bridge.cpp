@@ -1,8 +1,8 @@
 /*
  * JNI bridge between de.merzkevin.airrelay.bridge.NativeBridge and UxPlay.
  * Based on native_bridge.cpp from jqssun/android-airplay-server (GPL-3.0), reduced to one
- * fixed configuration: screen mirroring (H.264 only) plus sound, no HLS video, no PIN,
- * no persistent key file.
+ * fixed configuration: screen mirroring (H.264 only) plus sound, no PIN, no persistent key
+ * file. HLS video is off unless nativeSetHlsEnabled switches it on (test build only).
  *
  * The package name in the function names is the Kotlin code package (namespace), not the
  * applicationId, so renaming the app in Gradle does not touch this file.
@@ -43,6 +43,9 @@ typedef struct {
     android_callback_ctx_t cb_ctx;
     raop_callbacks_t callbacks;
     char hw_addr[6];
+    /* raop_set_lang keeps the pointer, so the system language list lives here;
+       a plain buffer because the struct is cleared with memset */
+    char lang_system[128];
 } server_ctx_t;
 
 static void _log_callback(void *cls, int level, const char *msg) {
@@ -136,7 +139,7 @@ Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeInit(
     }
     raop_set_dnssd(ctx->raop, ctx->dnssd);
 
-    /* mirroring plus sound only */
+    /* mirroring plus sound; HLS stays off unless nativeSetHlsEnabled turns it on */
     raop_set_plist(ctx->raop, "hls", 0);
     dnssd_set_airplay_features(ctx->dnssd, FEATURE_VIDEO, 0);
     dnssd_set_airplay_features(ctx->dnssd, FEATURE_HLS, 0);
@@ -286,4 +289,44 @@ Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeSetGain(
     (void)env; (void)thiz;
     server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
     if (ctx && ctx->cb_ctx.audio_engine) audio_engine_set_gain_q15(ctx->cb_ctx.audio_engine, gainQ15);
+}
+
+/*
+ * Announces and serves HLS video (YouTube hands over a stream URL instead of mirroring).
+ * Must run after nativeInit and before the dns-sd TXT records are read. systemLangs is a
+ * colon-separated list such as "de:en"; UxPlay needs at least one entry, so an empty list
+ * falls back to "en". Returns false (HLS stays off) if the Kotlin callbacks are missing.
+ */
+extern "C" JNIEXPORT jboolean JNICALL
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeSetHlsEnabled(
+        JNIEnv *env, jobject thiz, jlong handle, jstring systemLangs) {
+    (void)thiz;
+    server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
+    if (!ctx || !ctx->raop || !ctx->dnssd) return JNI_FALSE;
+    if (android_callbacks_enable_hls(&ctx->cb_ctx) != 0) {
+        LOGE("HLS requested but the Kotlin video callbacks are missing");
+        return JNI_FALSE;
+    }
+    const char *langs = systemLangs ? env->GetStringUTFChars(systemLangs, NULL) : NULL;
+    snprintf(ctx->lang_system, sizeof(ctx->lang_system), "%s",
+             (langs && langs[0]) ? langs : "en");
+    if (langs) env->ReleaseStringUTFChars(systemLangs, langs);
+    raop_set_lang(ctx->raop, "", "", ctx->lang_system);
+    raop_set_plist(ctx->raop, "hls", 1);
+    dnssd_set_airplay_features(ctx->dnssd, FEATURE_VIDEO, 1);
+    dnssd_set_airplay_features(ctx->dnssd, FEATURE_HLS, 1);
+    LOGI("HLS video on, system languages %s", ctx->lang_system);
+    return JNI_TRUE;
+}
+
+/* Player state for /playback-info; duration -1 tells the sender the video has ended. */
+extern "C" JNIEXPORT void JNICALL
+Java_de_merzkevin_airrelay_bridge_NativeBridge_nativeUpdatePlaybackInfo(
+        JNIEnv *env, jobject thiz, jlong handle, jfloat position, jfloat duration, jfloat rate,
+        jboolean ready) {
+    (void)env; (void)thiz;
+    server_ctx_t *ctx = (server_ctx_t *)(intptr_t)handle;
+    if (!ctx) return;
+    android_callbacks_update_playback_info(&ctx->cb_ctx, (double)position, (double)duration,
+                                           (float)rate, ready ? 1 : 0);
 }

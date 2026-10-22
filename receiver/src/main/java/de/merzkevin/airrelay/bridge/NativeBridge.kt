@@ -36,4 +36,12 @@ object NativeBridge {
     /** Full path of the playfair helper program (ReceiverConfig.PLAYFAIR_HELPER in
      *  nativeLibraryDir). Set before the first mirroring session; false if the path is too long. */
     external fun nativeSetPlayfairHelper(path: String): Boolean
+
+    /** Announces HLS video (YouTube and other apps hand over a stream URL). Call after
+     *  nativeInit, before nativeStart and nativeTxtRecords. systemLangs: "de:en", never empty.
+     *  False if the callbacks for it are missing; the receiver then stays as before. */
+    external fun nativeSetHlsEnabled(handle: Long, systemLangs: String): Boolean
+
+    /** Player state for the sender's /playback-info. duration -1: the video ended on the TV. */
+    external fun nativeUpdatePlaybackInfo(handle: Long, position: Float, duration: Float, rate: Float, ready: Boolean)
 }
