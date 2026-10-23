@@ -12,7 +12,7 @@ import org.junit.Test
 
 /**
  * Test package (".dev", debug) skips the subscription gate and announces "<name> Dev";
- * the store package behaves exactly as 0.1.4. Expectations written by hand, not derived
+ * the store package keeps the gate and the name of 0.1.4. Expectations written by hand, not derived
  * from TestPackage.
  */
 class TestPackageTest {

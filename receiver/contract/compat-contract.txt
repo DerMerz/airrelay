@@ -5,6 +5,7 @@ component: service .ReceiverService []
 component: receiver com.amazon.device.iap.ResponseReceiver []
 component: service com.amazon.device.iap.PurchasingService []
 component: receiver .BootReceiver [android.intent.action.BOOT_COMPLETED]
+component: activity .video.HlsActivity []
 notification-channel: receiver
 notification-channel: open_request
 dns-sd-type: _airplay._tcp

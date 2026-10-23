@@ -19,19 +19,19 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.exoplayer.ExoPlayer
+import de.merzkevin.airrelay.R
 
-/** Test build (debug source set): the HLS player is Media3 ExoPlayer. */
+/** The HLS player is Media3 ExoPlayer, in the store package and in the test package alike. */
 object HlsVideoFactory {
-    const val AVAILABLE = true
-
     fun create(context: Context, reporter: HlsVideo.Reporter): HlsVideo =
         ExoHlsVideo(context.applicationContext, reporter)
 }
 
 /**
- * Minimal HLS player for the 0.1.5 Durchstich: one ExoPlayer on the main thread, picture in
- * HlsActivity. Every step is logged under "AirRelayHls" so a single try on the stick tells
- * where it stops (URL received, prepared, first frame, error code).
+ * HLS player: one ExoPlayer on the main thread, created on the first /play and released when
+ * the video stops (whoever only mirrors never loads it), picture in HlsActivity. Every step is
+ * logged under "AirRelayHls" so a single try on the stick tells where it stops (URL received,
+ * prepared, first frame, error code).
  */
 internal class ExoHlsVideo(
     private val context: Context,
@@ -60,7 +60,7 @@ internal class ExoHlsVideo(
 
         override fun onPlayerError(error: PlaybackException) {
             Log.e(TAG, "player error ${error.errorCodeName}", error)
-            Toast.makeText(context, "HLS-Fehler: ${error.errorCodeName}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.video_not_playable, Toast.LENGTH_LONG).show()
             end("error")
         }
 

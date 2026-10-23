@@ -35,7 +35,7 @@
     <string name="network_settings">Network settings</string>
 
     <string name="licenses">Licences</string>
-    <string name="licenses_intro">This app is free software. You may redistribute and modify it under the terms of the GNU General Public License, version 3. It comes without any warranty.\n\nSource code: %1$s\n\nIncluded software:\n• android-airplay-server by jqssun (GPL-3.0), the basis of this app\n• UxPlay (GPL-3.0), with parts of RPiPlay and ShairPlay (LGPL-2.1 or later) and playfair (GPL)\n• libplist (LGPL-2.1 or later)\n• llhttp (MIT)\n• OpenSSL (Apache-2.0)\n• FFmpeg, only the ALAC decoder (LGPL-2.1 or later)\n• Oboe (Apache-2.0)\n\niPhone and iPad are trademarks of Apple Inc. Fire TV is a trademark of Amazon.com, Inc. or its affiliates. This app is not affiliated with Apple or Amazon.\n\nThe full text of the GNU General Public License, version 3, follows.</string>
+    <string name="licenses_intro">This app is free software. You may redistribute and modify it under the terms of the GNU General Public License, version 3. It comes without any warranty.\n\nSource code: %1$s\n\nIncluded software:\n• android-airplay-server by jqssun (GPL-3.0), the basis of this app\n• UxPlay (GPL-3.0), with parts of RPiPlay and ShairPlay (LGPL-2.1 or later) and playfair (GPL)\n• libplist (LGPL-2.1 or later)\n• llhttp (MIT)\n• OpenSSL (Apache-2.0)\n• FFmpeg, only the ALAC decoder (LGPL-2.1 or later)\n• Oboe (Apache-2.0)\n• AndroidX Media3 (ExoPlayer), AndroidX, Guava and the Kotlin standard library (Apache-2.0), Checker Framework qualifiers (MIT)\n\niPhone and iPad are trademarks of Apple Inc. Fire TV is a trademark of Amazon.com, Inc. or its affiliates. This app is not affiliated with Apple or Amazon.\n\nThe full text of the GNU General Public License, version 3, follows.</string>
 
     <!-- subscription (Amazon In-App Purchasing). Button texts name what you get and pay,
          never a command to buy. -->
@@ -76,4 +76,5 @@
     <string name="alert_channel">Mirroring</string>
     <string name="alert_mirroring">An iPhone or iPad is mirroring. Open to show it.</string>
     <string name="alert_refused">An iPhone or iPad wants to mirror. This needs a subscription.</string>
+    <string name="video_not_playable">This video cannot be played directly. On the iPhone or iPad, choose Screen Mirroring in Control Center.</string>
 </resources>

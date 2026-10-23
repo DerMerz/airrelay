@@ -6,19 +6,14 @@
 package de.merzkevin.airrelay.core
 
 /**
- * HLS video (an app such as YouTube hands over a stream URL instead of mirroring the screen).
- * Test build only for now (0.1.5 Durchstich): it is announced to senders only by the side-by-side
- * test package (applicationId suffix ".dev") and only if that build carries a player. The store
- * package keeps announcing mirroring plus sound exactly as 0.1.4 did.
+ * HLS video: a video app hands over a stream URL instead of mirroring the screen. Since 0.1.5
+ * the store package and the side-by-side test package both announce it and both carry the
+ * player. Who may play is the subscription gate's question, as for mirroring: native code asks
+ * it at /play (patch 0009) and ReceiverService.onVideoPlay asks it again.
  */
 object HlsPolicy {
-    const val TEST_PACKAGE_SUFFIX = ".dev"
-
     /** Language UxPlay falls back to when the system list is empty (it needs at least one). */
     const val FALLBACK_LANGUAGE = "en"
-
-    fun enabled(applicationId: String, playerAvailable: Boolean): Boolean =
-        playerAvailable && applicationId.endsWith(TEST_PACKAGE_SUFFIX)
 
     /**
      * Colon-separated language list for UxPlay's audio track choice ("de:en"), from the system

@@ -12,7 +12,7 @@ import android.view.KeyEvent
 import android.view.SurfaceView
 import android.widget.FrameLayout
 
-/** Test build: full-screen picture of the HLS player. Back ends the video. */
+/** Full-screen picture of the HLS player. Back ends the video. */
 class HlsActivity : Activity() {
     private lateinit var surface: SurfaceView
 

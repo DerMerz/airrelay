@@ -2,7 +2,7 @@
  * JNI bridge between de.merzkevin.airrelay.bridge.NativeBridge and UxPlay.
  * Based on native_bridge.cpp from jqssun/android-airplay-server (GPL-3.0), reduced to one
  * fixed configuration: screen mirroring (H.264 only) plus sound, no PIN, no persistent key
- * file. HLS video is off unless nativeSetHlsEnabled switches it on (test build only).
+ * file. HLS video is off unless nativeSetHlsEnabled switches it on (ReceiverService, HlsPolicy).
  *
  * The package name in the function names is the Kotlin code package (namespace), not the
  * applicationId, so renaming the app in Gradle does not touch this file.

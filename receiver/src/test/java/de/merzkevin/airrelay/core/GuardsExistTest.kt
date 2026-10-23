@@ -258,6 +258,31 @@ class GuardsExistTest {
         }
     }
 
+    @Test fun hlsGuardsExistAndCannotSkip() {
+        // 0.1.5: HLS video in the store package. Deleting these tests would leave everything green.
+        val names = mapOf(
+            "core/HlsGuardTest.kt" to listOf("playerShipsInStorePackage", "playAsksTheGateBeforeThePlayer",
+                "nativePlayRefusesUnadmittedSender", "noBrandNameInAppTexts", "nativeHlsCallbacksAreInertUnlessEnabled",
+                "nativeLookupsAreDeclaredAndKept"),
+            "video/HlsPlayerTest.kt" to listOf("factoryAlwaysReturnsTheExoPlayerImplementation", "hlsModuleIsFoundByThePlayer",
+                "C.CONTENT_TYPE_HLS in types"),
+            "core/TestPackageTest.kt" to listOf("storeNameIsExactlyTheOldName", "gateTableSuffixTimesBuildTypeTimesSubscription",
+                "licenseGateAppliesTheTestPackageFlag"),
+        )
+        for ((path, wanted) in names) {
+            val f = File(moduleDir, "src/test/java/de/merzkevin/airrelay/$path")
+            assertTrue("$path is gone", f.exists())
+            val t = f.readText()
+            assertFalse("$path must not be ignored", Regex("@[\\w.]*Ignore\\b").containsMatchIn(t))
+            for (forbidden in listOf("Assume.", "assumeTrue", "assumeFalse", "assumeNotNull")) {
+                assertFalse("$path must not skip ($forbidden)", t.contains(forbidden))
+            }
+            for (w in wanted) assertTrue("$path lost \"$w\"", t.contains(w))
+        }
+        assertTrue("patch 0009 is missing",
+            File(moduleDir, "src/main/cpp/patches/UxPlay/0009-refuse-unadmitted-client-on-play.patch").exists())
+    }
+
     @Test fun packagingWaitsForTheUnitTests() {
         val gradle = File(moduleDir, "build.gradle.kts").readText()
         assertTrue("build.gradle.kts no longer blocks packaging on the unit tests",

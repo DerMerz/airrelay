@@ -24,9 +24,14 @@ folder of each library under `receiver/src/main/cpp/third_party/`.
 | Oboe (audio output) | 1.9.3, submodule `third_party/oboe`, statically linked | Apache-2.0 | https://github.com/google/oboe | `third_party/oboe/LICENSE` |
 | libc++ from the Android NDK 27 | statically linked | Apache-2.0 with LLVM exception | https://developer.android.com/ndk | in the NDK |
 | Amazon Appstore SDK (`com.amazon.device:amazon-appstore-sdk`) | 3.0.9, Maven Central | Amazon, proprietary | downloaded during the build, not part of this repository | |
+| AndroidX Media3 (ExoPlayer), only `media3-exoplayer` and `media3-exoplayer-hls` with what they pull in: `media3-common`, `media3-container`, `media3-database`, `media3-datasource`, `media3-decoder`, `media3-extractor`; plays HLS video handed over by a sender (since 0.1.5), in `classes.dex` | 1.8.0, Maven (Google) | Apache-2.0 | https://github.com/androidx/media | downloaded during the build, text: https://www.apache.org/licenses/LICENSE-2.0 |
+| Libraries Media3 depends on, in `classes.dex` where R8 keeps them: AndroidX `annotation`, `annotation-experimental`, `collection`, `concurrent-futures`, `core`, `core-common`, `core-runtime`, `exifinterface`, `lifecycle-common`, `lifecycle-runtime`, `versionedparcelable`; Guava (`guava`, `failureaccess`, `listenablefuture`); annotations `jsr305`, `error_prone_annotations`, `j2objc-annotations` | as resolved by Gradle (`./gradlew :receiver:dependencies --configuration releaseRuntimeClasspath`), Maven | Apache-2.0 | https://android.googlesource.com/platform/frameworks/support, https://github.com/google/guava, https://github.com/google/error-prone, https://github.com/google/j2objc | downloaded during the build |
+| Checker Framework qualifiers (`checker-qual`), annotations only | as resolved by Gradle, Maven | MIT | https://github.com/typetools/checker-framework | downloaded during the build |
+| Kotlin standard library (`kotlin-stdlib`) with the JetBrains annotations (`annotations`) | as resolved by Gradle, Maven | Apache-2.0 | https://github.com/JetBrains/kotlin, https://github.com/JetBrains/java-annotations | downloaded during the build |
 
-Not included, although the upstream project uses them: ExoPlayer (Media3) and the Android Jetpack libraries.
-AirRelay has no AndroidX dependency, the picture goes straight through `MediaCodec`.
+Mirroring does not use Media3: the mirrored picture goes straight through `MediaCodec`. Media3 is
+only loaded when a sender hands over a video stream. Not included: `media3-ui`, Jetpack Compose and
+the other Jetpack libraries the upstream project uses.
 
 The patches to UxPlay are files in `receiver/src/main/cpp/patches/UxPlay/` and are applied during the
 build. The UxPlay source code itself stays unchanged in the submodule. The build copies UxPlay's `lib/`

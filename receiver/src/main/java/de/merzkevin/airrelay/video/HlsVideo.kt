@@ -7,8 +7,7 @@ package de.merzkevin.airrelay.video
 
 /**
  * Player for HLS video handed over by a sender. The calls come from UxPlay's threads and
- * must not block. Only the test build has an implementation (HlsVideoFactory in src/debug);
- * the release build has none, so it carries no player library.
+ * must not block. The implementation is ExoHlsVideo (HlsVideoFactory).
  */
 interface HlsVideo {
     fun play(url: String, startSec: Float)

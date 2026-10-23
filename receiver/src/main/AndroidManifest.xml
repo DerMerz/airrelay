@@ -27,6 +27,7 @@
         android:banner="@drawable/banner"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/hls_localhost"
         android:supportsRtl="true"
         android:theme="@style/Theme.AirRelay">
 
@@ -70,6 +71,13 @@
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
+
+        <!-- HLS video handed over by a sender (picture of the player; Back ends the video) -->
+        <activity
+            android:name=".video.HlsActivity"
+            android:exported="false"
+            android:theme="@android:style/Theme.Black.NoTitleBar.Fullscreen"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboard|keyboardHidden|navigation|uiMode" />
     </application>
 
 </manifest>

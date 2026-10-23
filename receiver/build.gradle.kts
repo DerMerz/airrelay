@@ -52,8 +52,8 @@ android {
         // Fire OS 6 (Android 7.1) and newer; the measured target is Fire OS 7 (API 28)
         minSdk = 24
         targetSdk = 36
-        versionCode = 5
-        versionName = "0.1.4"
+        versionCode = 6
+        versionName = "0.1.5"
         buildConfigField("String", "SOURCE_URL", "\"$sourceUrl\"")
 
         ndk {
@@ -194,10 +194,10 @@ dependencies {
     // Amazon Appstore SDK (In-App Purchasing v3): a plain 460 KB jar from Maven Central, no
     // transitive dependencies, no manifest of its own (entries are in AndroidManifest.xml).
     implementation("com.amazon.device:amazon-appstore-sdk:3.0.9")
-    // HLS test player (0.1.5 Durchstich): test package only, the store build carries no player
-    // (src/release/.../HlsVideoFactory.kt). HlsGuardTest fails if this becomes "implementation".
-    debugImplementation("androidx.media3:media3-exoplayer:1.8.0")
-    debugImplementation("androidx.media3:media3-exoplayer-hls:1.8.0")
+    // HLS video player (since 0.1.5), store package and test package alike; only these two
+    // modules, no media3-ui. HlsGuardTest fails if the store package loses it.
+    implementation("androidx.media3:media3-exoplayer:1.8.0")
+    implementation("androidx.media3:media3-exoplayer-hls:1.8.0")
     testImplementation("junit:junit:4.13.2")
     // ScreenFitTest: the screens at the sizes and font scales of a Fire TV, text measured by
     // the real Android text engine (GraphicsMode.NATIVE), not by a stand-in.

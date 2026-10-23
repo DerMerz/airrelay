@@ -1,8 +1,9 @@
 # AirRelay
 
 AirRelay is a lean AirPlay screen mirroring receiver for Fire TV (Fire OS, Android). It shows the
-screen of an iPhone, iPad or Mac on the TV, with sound, and nothing else: no video casting, no
-settings, no picture in picture, operated with the remote only. The source code is free software
+screen of an iPhone, iPad or Mac on the TV, with sound. Since 0.1.5 it also plays a video that an
+app hands over as a stream (HLS) instead of mirroring it. Nothing else: no settings, no picture in
+picture, operated with the remote only. The source code is free software
 under the GNU General Public License, version 3 or later.
 
 AirPlay, iPhone, iPad and Mac are trademarks of Apple Inc. Fire TV and Amazon Appstore are trademarks
@@ -40,11 +41,12 @@ license and location are listed in [`THIRD-PARTY.md`](THIRD-PARTY.md). In short:
 | ALAC decoder | [FFmpeg](https://github.com/FFmpeg/FFmpeg) n8.1.2 (submodule), ALAC only | LGPL-2.1+ |
 | Audio output | [Oboe](https://github.com/google/oboe) 1.9.3 (submodule, static) | Apache-2.0 |
 | Subscription handling | Amazon Appstore SDK 3.0.9 (Maven Central, not part of this repository) | Amazon, proprietary |
+| HLS video player (since 0.1.5) | [AndroidX Media3](https://github.com/androidx/media) 1.8.0, `media3-exoplayer` and `media3-exoplayer-hls` with AndroidX and Guava libraries (Maven) | Apache-2.0 (Checker Framework qualifiers: MIT) |
 
 The first commit contains the files taken over from the upstream project unchanged, and every later
 change is its own diff. Everything in Kotlin (service, decoder, user interface, subscription) and
-`native_bridge.cpp` is newly written. ExoPlayer (used upstream) is not part of AirRelay: the picture
-goes straight through `MediaCodec`.
+`native_bridge.cpp` is newly written. The mirrored picture goes straight through `MediaCodec`. Media3
+ExoPlayer (since 0.1.5) only plays a video handed over as a stream and is only created then.
 
 Note from UxPlay: the legal status of the FairPlay part (playfair) is unclear.
 
@@ -108,7 +110,8 @@ receiver/src/main/cpp/            native library libairrelay_native.so
   playfair/                       playfair helper program and the process call to it
   cmake/CheckLicenseSplit.cmake   build fails if playfair or lib/crypto.c end up in the library
   native_bridge.cpp               JNI, fixed configuration
-  android_raop_callbacks.c        8 callbacks into Kotlin, the rest answered natively
+  android_raop_callbacks.c        callbacks into Kotlin (mirroring, sound, subscription gate, HLS
+                                  video), the rest answered natively
   android_dnssd_shim.c            TXT records for NsdManager (jqssun)
   audio_*.h/.cpp, timeline_buffer.h  audio engine (jqssun), plus software volume
   patches/UxPlay/                 patches to UxPlay, applied during the build
@@ -117,6 +120,7 @@ receiver/src/main/java/de/merzkevin/airrelay/
   billing/                        subscription via Amazon In-App Purchasing
   ReceiverService.kt              foreground service: server, dns-sd, state
   video/VideoRenderer.kt          MediaCodec straight to the SurfaceView
+  video/HlsVideoFactory.kt        HLS video: Media3 ExoPlayer, created on /play, picture in HlsActivity
   MainActivity.kt                 the one screen
 receiver/contract/compat-contract.txt   frozen compatibility contract
 receiver/src/test/native/         host builds of the native code for NativeHostTest
@@ -133,7 +137,9 @@ Decisions with more than two cases are pure functions with a hand-written table:
   If the device name is changed, the receiver re-registers under the new name immediately.
   Long names are cut to 50 bytes, at a word boundary.
 - Announced: `_airplay._tcp` and `_raop._tcp`, features `0x5A7FFEE6,0x0`, audio `cn=0,2,3` (AAC),
-  HLS off, H.264 only, 1920x1080, 60 fps.
+  H.264 only, 1920x1080, 60 fps. HLS video on since 0.1.5 (before: off).
+- Without an active subscription or trial a sender is refused with "403 Forbidden", at SETUP for
+  mirroring and sound (patch 0007) and at /play for a video (patch 0009).
 - Port 7000. If it is taken (a second receiver app), the receiver uses a free port; senders
   read it from dns-sd.
 - When mirroring starts: the service brings the app to the front, full screen, picture fitted the

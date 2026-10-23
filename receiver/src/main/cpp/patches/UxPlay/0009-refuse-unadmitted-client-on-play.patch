@@ -1,0 +1,23 @@
+diff --git a/lib/http_handlers.h b/lib/http_handlers.h
+--- a/lib/http_handlers.h
++++ b/lib/http_handlers.h
+@@ -698,6 +698,19 @@
+     
+     logger_log(raop->logger, LOGGER_DEBUG, "http_handler_play");
+ 
++    /* the same question as at SETUP (patch 0007), asked before anything is parsed or
++       allocated: a sender that is not admitted gets "403 Forbidden" and no video starts.
++       Fails closed: without the callback nobody is admitted. */
++    bool admit_client = false;
++    if (raop->callbacks.report_client_request) {
++        raop->callbacks.report_client_request(raop->callbacks.cls, NULL, NULL, NULL, &admit_client);
++    }
++    if (admit_client == false) {
++        logger_log(raop->logger, LOGGER_INFO, "http_handler_play: client not admitted");
++        http_response_init(response, "HTTP/1.1", 403, "Forbidden");
++        return;
++    }
++
+     const char* apple_session_id = http_request_get_header(request, "X-Apple-Session-ID");
+     if (!apple_session_id) {
+         logger_log(raop->logger, LOGGER_ERR, "Play request had no X-Apple-Session-ID");

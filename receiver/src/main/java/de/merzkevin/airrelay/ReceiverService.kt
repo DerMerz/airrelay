@@ -115,7 +115,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
     private var wakeLock: PowerManager.WakeLock? = null
     @Volatile private var senderDb = 0f
 
-    /** HLS player, test package only (HlsPolicy); null in the store package. */
+    /** HLS player (HlsPolicy), set in onCreate. ExoPlayer itself only exists while a video plays. */
     private var hls: HlsVideo? = null
 
     /** Player state goes to native code on the server thread, like every other native call. */
@@ -137,7 +137,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         serverThread = HandlerThread("server").apply { start() }
         server = Handler(serverThread.looper)
         renderer = VideoRenderer(this, codecSize())
-        hls = if (HlsPolicy.enabled(packageName, HlsVideoFactory.AVAILABLE)) HlsVideoFactory.create(this, hlsReporter) else null
+        hls = HlsVideoFactory.create(this, hlsReporter)
         wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager)
             .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "airrelay:session")
             .apply { setReferenceCounted(false) }
@@ -448,9 +448,20 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
 
     override fun onVideoData(data: ByteArray, ptsNs: Long) = renderer.onFrame(data, ptsNs)
 
-    // ---- HLS video (test package only, see HlsPolicy) ----
+    // ---- HLS video (see HlsPolicy) ----
 
+    /**
+     * /play (UxPlay thread). Native code already refused a sender without a subscription with
+     * 403 (patch 0009); this is the second lock, so a native slip still plays nothing.
+     */
     override fun onVideoPlay(url: String, startSec: Float) {
+        if (!LicenseGate.admitsSender()) {
+            Log.i(TAG, "HLS play refused: ${LicenseGate.access}")
+            hlsReporter.report(0f, -1f, 0f, false) // "ended": the sender stops waiting
+            Subscriptions.onSenderRefused()
+            main.post { bringToFront(FrontReason.SENDER_REFUSED) }
+            return
+        }
         Log.i(TAG, "HLS play requested from $startSec s")
         hls?.play(url, startSec)
     }
