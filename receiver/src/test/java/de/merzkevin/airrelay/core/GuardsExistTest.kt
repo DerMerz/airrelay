@@ -87,6 +87,16 @@ class GuardsExistTest {
         assertTrue(svc.contains("return admitted"))
     }
 
+    @Test fun testPackageSkipIsBoundToDebugAndSuffix() {
+        // the test package skips the gate; that must stay tied to the debug build and ".dev"
+        val subs = File(moduleDir, "src/main/java/de/merzkevin/airrelay/billing/Subscriptions.kt").readText()
+        assertTrue("test package flag no longer bound to the build type",
+            subs.contains("LicenseGate.testPackage = TestPackage.isTestPackage(app.packageName, BuildConfig.DEBUG)"))
+        val gradle = File(moduleDir, "build.gradle.kts").readText()
+        val release = gradle.substringAfter("release {").substringBefore("}")
+        assertFalse("release build must not take an applicationId suffix", release.contains("applicationIdSuffix"))
+    }
+
     @Test fun gplOnlyPartsStayOutOfTheLibrary() {
         val cmake = File(moduleDir, "src/main/cpp/CMakeLists.txt").readText()
         assertFalse("UxPlay lib/crypto.c is compiled again", Regex("UXPLAY_\\w+\\}/crypto\\.c").containsMatchIn(cmake))

@@ -11,6 +11,7 @@ import android.net.NetworkCapabilities
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import de.merzkevin.airrelay.BuildConfig
 import de.merzkevin.airrelay.core.Access
 import de.merzkevin.airrelay.core.CacheRead
 import de.merzkevin.airrelay.core.CachedEntitlement
@@ -22,6 +23,7 @@ import de.merzkevin.airrelay.core.ReceiptInfo
 import de.merzkevin.airrelay.core.Skus
 import de.merzkevin.airrelay.core.SubscriptionRules
 import de.merzkevin.airrelay.core.SubscriptionStatus
+import de.merzkevin.airrelay.core.TestPackage
 import de.merzkevin.airrelay.core.accessFor
 import de.merzkevin.airrelay.core.activeReceipts
 import de.merzkevin.airrelay.core.cachedAtMs
@@ -105,6 +107,9 @@ object Subscriptions : StoreClient.Listener {
     fun init(context: Context, storeClient: StoreClient = AmazonStoreClient()) {
         if (::app.isInitialized) return
         app = context.applicationContext
+        // before the first publish: the test package (".dev", debug) skips the gate
+        LicenseGate.testPackage = TestPackage.isTestPackage(app.packageName, BuildConfig.DEBUG)
+        if (LicenseGate.testPackage) Log.i(TAG, "test package ${app.packageName}: subscription gate skipped")
         store = EntitlementStore(app.filesDir)
         val read = store.read()
         if (read !is CacheRead.Loaded && read != CacheRead.Missing) Log.w(TAG, "stored status not usable: $read")

@@ -46,15 +46,16 @@ import de.merzkevin.airrelay.core.ReceiverConfig
 import de.merzkevin.airrelay.core.ReceiverState
 import de.merzkevin.airrelay.core.ServerStatus
 import de.merzkevin.airrelay.core.Size
+import de.merzkevin.airrelay.core.TestPackage
 import de.merzkevin.airrelay.core.WifiAdvice
 import de.merzkevin.airrelay.core.advertisedSize
 import de.merzkevin.airrelay.core.airplayVolumeToGainQ15
+import de.merzkevin.airrelay.core.announcedReceiverName
 import de.merzkevin.airrelay.core.bandClass
 import de.merzkevin.airrelay.core.catchUpClass
 import de.merzkevin.airrelay.core.deviceIdFor
 import de.merzkevin.airrelay.core.needsFullScreenAlert
 import de.merzkevin.airrelay.core.pickIpv4
-import de.merzkevin.airrelay.core.receiverName
 import de.merzkevin.airrelay.core.rssiClass
 import de.merzkevin.airrelay.core.startOutcome
 import de.merzkevin.airrelay.core.wifiAdvice
@@ -122,6 +123,9 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
         server.post { if (handle != 0L) NativeBridge.nativeUpdatePlaybackInfo(handle, position, duration, rate, ready) }
     }
 
+    /** Side-by-side test package (".dev", debug): announces "<name> Dev" (TestPackage). */
+    private val testPackage by lazy { TestPackage.isTestPackage(packageName, BuildConfig.DEBUG) }
+
     private val nsd by lazy { getSystemService(Context.NSD_SERVICE) as NsdManager }
     private val connectivity by lazy { getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager }
 
@@ -186,7 +190,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
 
     private fun startServer() {
         if (handle != 0L) return
-        val name = receiverName(Settings.Global.getString(contentResolver, DEVICE_NAME_SETTING))
+        val name = announcedReceiverName(Settings.Global.getString(contentResolver, DEVICE_NAME_SETTING), testPackage)
         val ip = currentIpv4()
         // the hint counter keeps counting up, so a screen never mistakes a new hint for one it showed
         update { it.restarting(name, ip) }
@@ -346,7 +350,7 @@ class ReceiverService : Service(), NativeCallbacks, VideoRenderer.Listener {
 
     private val nameObserver = object : ContentObserver(main) {
         override fun onChange(selfChange: Boolean) {
-            val name = receiverName(Settings.Global.getString(contentResolver, DEVICE_NAME_SETTING))
+            val name = announcedReceiverName(Settings.Global.getString(contentResolver, DEVICE_NAME_SETTING), testPackage)
             server.post { if (startedName != null && name != startedName) restartServer("device name changed") }
         }
     }

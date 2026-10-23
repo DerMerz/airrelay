@@ -19,7 +19,7 @@ const val MAX_NAME_BYTES = 50
  * Receiver name shown on the iPhone: the Fire TV's own device name, cleaned up so it is a
  * valid dns-sd label, or [FALLBACK_RECEIVER_NAME].
  */
-fun receiverName(deviceName: String?): String {
+fun receiverName(deviceName: String?, maxBytes: Int = MAX_NAME_BYTES): String {
     if (deviceName == null) return FALLBACK_RECEIVER_NAME
     val cleaned = deviceName
         .filterNot { it.isISOControl() }
@@ -28,7 +28,18 @@ fun receiverName(deviceName: String?): String {
         .trimEnd('.')
         .trim()
     if (cleaned.isEmpty() || cleaned.trim('.').equals("local", ignoreCase = true)) return FALLBACK_RECEIVER_NAME
-    return truncateUtf8(cleaned, MAX_NAME_BYTES)
+    return truncateUtf8(cleaned, maxBytes)
+}
+
+/**
+ * Name announced on both dns-sd services and shown on the TV. The store package announces
+ * [receiverName] unchanged; the test package appends [TestPackage.NAME_SUFFIX] and keeps the
+ * whole name within [MAX_NAME_BYTES].
+ */
+fun announcedReceiverName(deviceName: String?, testPackage: Boolean): String {
+    if (!testPackage) return receiverName(deviceName)
+    val room = MAX_NAME_BYTES - TestPackage.NAME_SUFFIX.toByteArray(Charsets.UTF_8).size
+    return receiverName(deviceName, room) + TestPackage.NAME_SUFFIX
 }
 
 /**

@@ -86,8 +86,12 @@ fun Screen.isError(): Boolean =
 object LicenseGate {
     @Volatile var access: Access = Access.CHECKING
 
-    fun current(): Entitlement = access.entitlement()
+    /** Set once at start ([TestPackage.isTestPackage]); false (store behaviour) until then. */
+    @Volatile var testPackage: Boolean = false
 
-    /** The decision at a sender's first SETUP: only [Access.UNLOCKED] lets it in. */
-    fun admitsSender(): Boolean = access.admitsSender
+    fun current(): Entitlement = TestPackage.entitlement(testPackage, access)
+
+    /** The decision at a sender's first SETUP: only [Access.UNLOCKED] lets it in
+     *  (in the test package every sender). */
+    fun admitsSender(): Boolean = current() == Entitlement.UNLOCKED
 }
