@@ -118,7 +118,7 @@ class HlsGuardTest {
         val files = res.walkTopDown().filter { it.isFile && it.name == "strings.xml" }.toList()
         assertTrue("no strings.xml found", files.size >= 2)
         for (f in files) {
-            assertFalse("${f.parentFile.name}/strings.xml names YouTube", f.readText().contains("youtube", ignoreCase = true))
+            assertFalse("${f.parentFile?.name}/strings.xml names YouTube", f.readText().contains("youtube", ignoreCase = true))
         }
     }
 
