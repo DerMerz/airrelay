@@ -29,6 +29,10 @@ class GuardsExistTest {
             assertFalse("CompatContractTest must not skip ($forbidden)", t.contains(forbidden))
         }
         assertTrue("detector self-test is gone", t.contains("detectorSeesStoredPreferencesThatAppear"))
+        // without these inputs a deleted or edited frozen contract leaves the test UP-TO-DATE and green
+        val gradle = File(moduleDir, "build.gradle.kts").readText()
+        assertTrue("unit tests no longer rerun when the frozen contract changes",
+            Regex("inputs\\.files\\(\\s*fileTree\\(\"contract\"\\),\\s*fileTree\\(\"src\"\\)").containsMatchIn(gradle))
     }
 
     @Test fun frozenContractExistsAndHoldsTheIdentity() {

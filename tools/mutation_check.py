@@ -327,6 +327,9 @@ MUTATIONS = [
      "class HlsGuardTest {", "@org.junit.Ignore class HlsGuardTest {"),
     ("guard: HLS player test lost its HLS check", "receiver/src/test/java/de/merzkevin/airrelay/video/HlsPlayerTest.kt",
      "C.CONTENT_TYPE_HLS in types", "C.CONTENT_TYPE_HLS !in types || true"),
+    # ---- T-31g: tests rerun when a file they read from disk changes ----
+    ("guard: frozen contract no longer a test input (stale green)", "receiver/build.gradle.kts",
+     '        fileTree("contract"),\n', ""),
 ]
 
 
