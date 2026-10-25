@@ -183,17 +183,20 @@ tasks.withType<Test>().configureEach {
     // ResponseReceiver, whose old bytecode has no stack map frames and fails the verifier on JDK 17.
     // Tests only; the app is not touched.
     jvmArgs("-XX:+UnlockDiagnosticVMOptions", "-XX:-BytecodeVerificationRemote") // T31-JVM
-    // The contract and guard tests read these files straight from disk (the frozen contract,
-    // the manifest, source text, this script). Declared as inputs, so a changed or deleted
-    // frozen contract reruns the tests instead of reusing an earlier green result, which would
-    // let the packaging blocker above pass (T-31g: a frozen line removed, the test stayed
-    // UP-TO-DATE and green). GuardsExistTest fails if this disappears.
+    // The contract and guard tests read files straight from disk (the frozen contract, the
+    // manifest, source text, this script). An earlier green result must never stand in for a
+    // run: T-31g, a frozen contract line removed, testReleaseUnitTest stayed UP-TO-DATE and
+    // assembleRelease packaged past the blocker above, also with these files declared as
+    // inputs (a change made right before the build was not seen in time). So the unit tests
+    // always run and never come from a cache. GuardsExistTest fails if this disappears.
     inputs.files(
         fileTree("contract"),
         fileTree("src") { exclude("main/cpp/third_party/**") },
         file("build.gradle.kts"),
         rootProject.file("LICENSE-EXCEPTION.md"),
     ).withPropertyName("filesReadByTests").withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.cacheIf { false }
+    outputs.upToDateWhen { false } // T-31g: tests always run
 }
 
 tasks.withType<Zip>().configureEach {

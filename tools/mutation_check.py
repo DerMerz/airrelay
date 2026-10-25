@@ -330,6 +330,10 @@ MUTATIONS = [
     # ---- T-31g: tests rerun when a file they read from disk changes ----
     ("guard: frozen contract no longer a test input (stale green)", "receiver/build.gradle.kts",
      '        fileTree("contract"),\n', ""),
+    ("guard: unit tests may be UP-TO-DATE again (stale green)", "receiver/build.gradle.kts",
+     "    outputs.upToDateWhen { false } // T-31g: tests always run\n", ""),
+    ("guard: unit test results may come from a cache", "receiver/build.gradle.kts",
+     "    outputs.cacheIf { false }\n", ""),
 ]
 
 
