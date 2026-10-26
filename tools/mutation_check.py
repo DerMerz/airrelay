@@ -338,7 +338,12 @@ MUTATIONS = [
 
 
 def run_tests() -> int:
-    r = subprocess.run(["./gradlew", ":receiver:testDebugUnitTest", "--offline", "-q", "--console=plain"],
+    # --rerun-tasks forces compileDebugKotlin to run, so the mutated source is always recompiled.
+    # Without it a stale compile (macOS file-watching lag, the same cause as the always-run fix in
+    # build.gradle.kts) ran the test against un-mutated bytecode and reported a real mutant as GREEN
+    # (T-31g, mutant 141 flaked on c85b20b: isTestPackage(dev, false) was not recompiled).
+    r = subprocess.run(["./gradlew", ":receiver:testDebugUnitTest", "--offline", "--rerun-tasks",
+                        "-q", "--console=plain"],
                        cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     return r.returncode
 
