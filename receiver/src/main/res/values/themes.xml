@@ -43,7 +43,7 @@
         <item name="android:paddingEnd">28dp</item>
         <item name="android:paddingTop">12dp</item>
         <item name="android:paddingBottom">12dp</item>
-        <item name="android:textColor">@color/tv_button_text</item>
+        <item name="android:textColor">@color/text_primary</item>
         <item name="android:textSize">20sp</item>
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
@@ -67,7 +67,7 @@
         <item name="android:layout_width">match_parent</item>
         <item name="android:layout_height">wrap_content</item>
         <item name="android:duplicateParentState">true</item>
-        <item name="android:textColor">@color/offer_option_title</item>
+        <item name="android:textColor">@color/text_primary</item>
         <item name="android:textSize">18sp</item>
         <item name="android:fontFamily">sans-serif-medium</item>
     </style>
@@ -77,7 +77,7 @@
         <item name="android:layout_height">wrap_content</item>
         <item name="android:layout_marginTop">2dp</item>
         <item name="android:duplicateParentState">true</item>
-        <item name="android:textColor">@color/offer_option_detail</item>
+        <item name="android:textColor">@color/text_on_chip</item>
         <item name="android:textSize">16sp</item>
     </style>
 </resources>

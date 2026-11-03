@@ -9,11 +9,11 @@
     <color name="accent">#FF7DB8FF</color>
     <color name="accent_dim">#337DB8FF</color>
     <color name="warning">#FFFFB27D</color>
-    <color name="focus_fill">#FFF4F7FC</color>
-    <color name="focus_text">#FF0A1020</color>
+    <color name="focus_ring">#FFF4F7FC</color>
     <color name="chip_fill">#1FFFFFFF</color>
     <color name="overlay">#CC0A1020</color>
     <color name="offer_fill">#14FFFFFF</color>
-    <!-- accent that stays readable on the white focus fill -->
-    <color name="focus_accent">#FF1E5FC2</color>
+    <!-- texts on chip_fill: at least 4.5:1 over the brightest spot of the background -->
+    <color name="text_on_chip">#FFD5DCE8</color>
+    <color name="accent_on_chip">#FFAFD4FF</color>
 </resources>

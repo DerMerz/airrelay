@@ -88,7 +88,7 @@
                     style="@style/OfferOptionDetail"
                     android:fontFamily="sans-serif-medium"
                     android:textSize="15sp"
-                    android:textColor="@color/offer_option_compare"
+                    android:textColor="@color/accent_on_chip"
                     tools:text="1,25 € im Monat, 49 % günstiger" />
             </LinearLayout>
 

@@ -1,10 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- focused: white fill; activated (the preselected yearly term): accent outline -->
+<!-- focused: light ring; activated (the preselected yearly term): accent outline. The fill and
+     the text colours are the same in every state, see tv_button.xml. -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <item android:state_focused="true">
         <shape>
             <corners android:radius="18dp" />
-            <solid android:color="@color/focus_fill" />
+            <solid android:color="@color/chip_fill" />
+            <stroke android:width="3dp" android:color="@color/focus_ring" />
         </shape>
     </item>
     <item android:state_activated="true">
